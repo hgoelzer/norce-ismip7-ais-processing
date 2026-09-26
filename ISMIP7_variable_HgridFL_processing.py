@@ -81,19 +81,20 @@ else:
 forcing_member_id = 'f001'
 
 # ----------------------------------------------------------------------
-# Experiment lookup: set_counter and time_range for the 11 CORE runs
+# Experiment lookup: set_counter for the 11 CORE runs
 # (m01/m02 pairs share the same set_counter; ocx is C011)
+# The time_range tag in the output filename is derived from the data below.
 # ----------------------------------------------------------------------
 exp_map = {
-    'historical': ('C001', '1970-2014'),
-    'ssp370':     ('C003', '2015-2100'),
-    'ssp126':     ('C005', '2015-2300'),
-    'ssp585':     ('C007', '2015-2300'),
-    'ctrl2015':   ('C009', '2015-2300'),
-    'ocx':        ('C011', '1979-2025'),
+    'historical': 'C001',
+    'ssp370':     'C003',
+    'ssp126':     'C005',
+    'ssp585':     'C007',
+    'ctrl2015':   'C009',
+    'ocx':        'C011',
 }
 if exp in exp_map:
-    set_counter_base, time_range = exp_map[exp]
+    set_counter_base = exp_map[exp]
 else:
     sys.exit(f'Error: unknown experiment {exp}')
 
@@ -155,28 +156,27 @@ except Exception:
     print('Error: Unable to open CISM file for expt ', exp)
     sys.exit('exiting program now')
 
+# Keep all time entries: the first CISM output is the end of the first
+# simulation year (e.g. 1970 for historical), so nothing is dropped.
 time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-# ice_mask = nidsrc['ice_mask'][1::, :, :]  # not available in NORCE output
-ice_mask = nidsrc['ice_domain_mask'][1::, :, :]
-f_ground = nidsrc['f_ground_cell'][1::, :, :]*ice_mask
+# ice_mask = nidsrc['ice_mask'][:, :, :]  # not available in NORCE output
+ice_mask = nidsrc['ice_domain_mask'][:, :, :]
+f_ground = nidsrc['f_ground_cell'][:, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
 
-# acab_dst         = nidsrc['acab_applied_tavg'][1::, :, :]  # not available in NORCE output
-acab_dst         = nidsrc['acab_applied'][1::, :, :]
-# basal_flux_dst   = nidsrc['basal_mbal_flux_tavg'][1::, :, :]  # not available in NORCE output
-basal_flux_dst   = np.zeros_like(nidsrc['dthck_dt'][1::, :, :])
-dthckdt_dst      = nidsrc['dthck_dt'][1::, :, :]
-# calving_flux_dst = nidsrc['calving_flux_tavg'][1::, :, :]  # not available in NORCE output
-calving_flux_dst = nidsrc['calving_rate'][1::, :, :]
-# latmelt_dst      = nidsrc['latmelt_flux_tavg'][1::, :, :]  # not available in NORCE output
-latmelt_dst      = np.zeros_like(nidsrc['dthck_dt'][1::, :, :])
-
-thk_init = nidsrc['thk'][0:2, :, :]
-dthckdt_dst[0, :, :] = (thk_init[1, :, :]-thk_init[0, :, :])/(time_dst[1]-time_dst[0])
+# acab_dst         = nidsrc['acab_applied_tavg'][:, :, :]  # not available in NORCE output
+acab_dst         = nidsrc['acab_applied'][:, :, :]
+# basal_flux_dst   = nidsrc['basal_mbal_flux_tavg'][:, :, :]  # not available in NORCE output
+basal_flux_dst   = np.zeros_like(nidsrc['dthck_dt'][:, :, :])
+dthckdt_dst      = nidsrc['dthck_dt'][:, :, :]
+# calving_flux_dst = nidsrc['calving_flux_tavg'][:, :, :]  # not available in NORCE output
+calving_flux_dst = nidsrc['calving_rate'][:, :, :]
+# latmelt_dst      = nidsrc['latmelt_flux_tavg'][:, :, :]  # not available in NORCE output
+latmelt_dst      = np.zeros_like(nidsrc['dthck_dt'][:, :, :])
 
 nidsrc.close()
 
@@ -186,6 +186,13 @@ ny = len(y_dst)
 
 
 print(f"nt={nt}, ny={ny}, nx={nx}")
+
+# The time_range tag in the output filename is derived from the data:
+# entry t (CISM year time_dst[t]) covers nominal year time_dst[t]-1, so the
+# first/last nominal years are time_dst[0]-1 / time_dst[-1]-1. It therefore
+# adjusts automatically when a run is extended by one year.
+time_range = f"{int(time_dst[0])-1}-{int(time_dst[-1])-1}"
+print('time_range =', time_range)
 
 
 # readListPrevExptString = [ 'licalvf', 'dlithkdt',  'acabf']
@@ -216,14 +223,18 @@ nidprev.close()
 # ----------------------------------------------------------------------
 # Time axes
 # ----------------------------------------------------------------------
+# CISM writes the first output at the end of the first simulation year:
+# entry t (time_dst[t]) is the state / year-mean of nominal year time_dst[t]-1.
+# FL fields (year-means) are assigned to the middle of the nominal year,
+# Jul 1 of time_dst[t]-1; the bounds span that nominal year.
 timeST = np.zeros(nt)
-timeFL = np.zeros(nt-1)
+timeFL = np.zeros(nt)
 
 for t in range(nt):
-    timeST[t] = days_since_1850(int(time_dst[t]), 1, 1)  # time in days
+    timeST[t] = days_since_1850(int(time_dst[t]), 1, 1)      # time in days
 
-for t in range(nt-1):
-    timeFL[t] = days_since_1850(int(time_dst[t]), 7, 1)  # time in days
+for t in range(nt):
+    timeFL[t] = days_since_1850(int(time_dst[t])-1, 7, 1)    # time in days
 
 print(time_dst)
 
@@ -263,8 +274,8 @@ for field in fieldFL:
     time[:] = timeFL[:]  # time in days since 1850
 
     time_bounds = ncid.createVariable('time_bounds', 'f4', ('time', 'bnds',))
-    time_bounds[:, 0] = timeST[0:-1]
-    time_bounds[:, 1] = timeST[1::]
+    time_bounds[:, 0] = np.array([days_since_1850(int(time_dst[t])-1, 1, 1) for t in range(nt)])
+    time_bounds[:, 1] = timeST[:]
 
     ncid.createDimension('x', size=nx)
     x    = ncid.createVariable('x', 'f4', ('x'))
@@ -284,7 +295,7 @@ for field in fieldFL:
         acabf.units         = 'kg m-2 s-1'
         acabf.long_name     = 'surface mass balance flux'
         acabf.standard_name = 'land_ice_surface_specific_mass_balance_flux'
-        acabf[:, :, :] = acab_dst[1::, :, :]*rhoi/sPerY
+        acabf[:, :, :] = acab_dst[:, :, :]*rhoi/sPerY
 
     if field in ['libmassbfgr']:
         # Not written: source variable not available in NORCE output (skipped in the loop above)
@@ -292,7 +303,7 @@ for field in fieldFL:
         libmassbfgr.units         = 'kg m-2 s-1'
         libmassbfgr.long_name     = 'basal mass balance flux beneath grounded ice'
         libmassbfgr.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbfgr[:, :, :] = basal_flux_dst[1::, :, :]*f_ground[1::, :, :]
+        libmassbfgr[:, :, :] = basal_flux_dst[:, :, :]*f_ground[:, :, :]
 
     if field in ['libmassbffl']:
         # Not written: source variable not available in NORCE output (skipped in the loop above)
@@ -300,14 +311,14 @@ for field in fieldFL:
         libmassbffl.units         = 'kg m-2 s-1'
         libmassbffl.long_name     = 'basal mass balance flux beneath floating ice'
         libmassbffl.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbffl[:, :, :] = basal_flux_dst[1::, :, :]*f_float[1::, :, :]
+        libmassbffl[:, :, :] = basal_flux_dst[:, :, :]*f_float[:, :, :]
 
     if field in ['dlithkdt']:
         dlithkdt = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         dlithkdt.units         = 'm s-1'
         dlithkdt.long_name     = 'ice thickness imbalance'
         dlithkdt.standard_name = 'tendency_of_land_ice_thickness'
-        dlithkdt[:, :, :] = (dthckdt_dst[1:, :, :] + dthckdt_dst[0:-1, :, :])/2./sPerY
+        dlithkdt[:, :, :] = dthckdt_dst[:, :, :]/sPerY
 
     if field in ['licalvf']:
         # Not written: source variable not available in NORCE output (skipped in the loop above)
@@ -315,16 +326,16 @@ for field in fieldFL:
         licalvf.units         = 'kg m-2 s-1'
         licalvf.long_name     = 'calving flux'
         licalvf.standard_name = 'land_ice_specific_mass_flux_due_to_calving'
-        # licalvf[:,:,:] = calving_flux_dst[1::,:,:]
+        # licalvf[:,:,:] = calving_flux_dst[:,:,:]
         # Temporary fix for positive values
-        licalvf[:, :, :] = np.where(calving_flux_dst[1::, :, :] > 0, 0, calving_flux_dst[1::, :, :])
+        licalvf[:, :, :] = np.where(calving_flux_dst[:, :, :] > 0, 0, calving_flux_dst[:, :, :])
 
     if field in ['lifmassbf']:
         lifmassbf = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         lifmassbf.units         = 'kg m-2 s-1'
         lifmassbf.long_name     = 'loss of ice mass resulting from ice front melting'
         lifmassbf.standard_name = 'land_ice_specific_mass_flux_due_to_ice_front_melting'
-        lifmassbf[:, :, :] = latmelt_dst[1::, :, :]  # zeros - latmelt not available in NORCE output
+        lifmassbf[:, :, :] = latmelt_dst[:, :, :]  # zeros - latmelt not available in NORCE output
 
 
     if field in ['ligroundf']:

@@ -14,8 +14,10 @@ Experiments (set_counter):
     ssp585     m02 -> C008   (2015-2300)
     ctrl2015   m01 -> C009   (2015-2300)
     ctrl2015   m02 -> C010   (2015-2300)
-    ocx        r01 -> C011   (1979-2025)
-
+    ocx        r01 -> C011   (1990-2025)
+The time_range tag in the output filenames is derived from the actual time
+axis of the model output, so it adjusts automatically when a run is
+extended (e.g. historical 1970-2013 -> 1970-2014 with the new output).
 Usage:
     python run_all_CORE.py                 # run everything
     python run_all_CORE.py --exp ssp126    # run only one experiment (all members)

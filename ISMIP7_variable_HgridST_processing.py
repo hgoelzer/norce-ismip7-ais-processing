@@ -80,19 +80,20 @@ else:
 forcing_member_id = 'f001'
 
 # ----------------------------------------------------------------------
-# Experiment lookup: set_counter and time_range for the 11 CORE runs
+# Experiment lookup: set_counter for the 11 CORE runs
 # (m01/m02 pairs share the same set_counter; ocx is C011)
+# The time_range tag in the output filename is derived from the data below.
 # ----------------------------------------------------------------------
 exp_map = {
-    'historical': ('C001', '1970-2014'),
-    'ssp370':     ('C003', '2015-2100'),
-    'ssp126':     ('C005', '2015-2300'),
-    'ssp585':     ('C007', '2015-2300'),
-    'ctrl2015':   ('C009', '2015-2300'),
-    'ocx':        ('C011', '1979-2025'),
+    'historical': 'C001',
+    'ssp370':     'C003',
+    'ssp126':     'C005',
+    'ssp585':     'C007',
+    'ctrl2015':   'C009',
+    'ocx':        'C011',
 }
 if exp in exp_map:
-    set_counter_base, time_range = exp_map[exp]
+    set_counter_base = exp_map[exp]
 else:
     sys.exit(f'Error: unknown experiment {exp}')
 
@@ -140,19 +141,21 @@ except Exception:
     print('Error: Unable to open CISM file for expt ', exp)
     sys.exit('exiting program now')
 
-time_dst = nidsrc['time'][1::]
+# Keep all time entries: the first CISM output is the end of the first
+# simulation year (e.g. 1970 for historical), so nothing is dropped.
+time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-# ice_mask = nidsrc['ice_mask'][1::, :, :]  # not available in NORCE output
-ice_mask = nidsrc['ice_domain_mask'][1::, :, :]
-f_ground = nidsrc['f_ground_cell'][1::, :, :]*ice_mask
+# ice_mask = nidsrc['ice_mask'][:, :, :]  # not available in NORCE output
+ice_mask = nidsrc['ice_domain_mask'][:, :, :]
+f_ground = nidsrc['f_ground_cell'][:, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
-thk_dst   = nidsrc['thk'][1::, :, :]
-topg_dst  = nidsrc['topg'][1::, :, :]
-usurf_dst = nidsrc['usurf'][1::, :, :]
-lsurf_dst = nidsrc['lsurf'][1::, :, :]
+thk_dst   = nidsrc['thk'][:, :, :]
+topg_dst  = nidsrc['topg'][:, :, :]
+usurf_dst = nidsrc['usurf'][:, :, :]
+lsurf_dst = nidsrc['lsurf'][:, :, :]
 
 nidsrc.close()
 
@@ -162,6 +165,13 @@ ny = len(y_dst)
 
 
 print(f"nt={nt}, ny={ny}, nx={nx}")
+
+# The time_range tag in the output filename is derived from the data:
+# entry t (CISM year time_dst[t]) covers nominal year time_dst[t]-1, so the
+# first/last nominal years are time_dst[0]-1 / time_dst[-1]-1. It therefore
+# adjusts automatically when a run is extended by one year.
+time_range = f"{int(time_dst[0])-1}-{int(time_dst[-1])-1}"
+print('time_range =', time_range)
 
 
 # ----------------------------------------------------------------------

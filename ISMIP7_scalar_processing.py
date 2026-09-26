@@ -68,19 +68,20 @@ else:
 forcing_member_id = 'f001'
 
 # ----------------------------------------------------------------------
-# Experiment lookup: set_counter and time_range for the 11 CORE runs
+# Experiment lookup: set_counter for the 11 CORE runs
 # (m01/m02 pairs share the same set_counter; ocx is C011)
+# The time_range tag in the output filename is derived from the data below.
 # ----------------------------------------------------------------------
 exp_map = {
-    'historical': ('C001', '1970-2014'),
-    'ssp370':     ('C003', '2015-2100'),
-    'ssp126':     ('C005', '2015-2300'),
-    'ssp585':     ('C007', '2015-2300'),
-    'ctrl2015':   ('C009', '2015-2300'),
-    'ocx':        ('C011', '1979-2025'),
+    'historical': 'C001',
+    'ssp370':     'C003',
+    'ssp126':     'C005',
+    'ssp585':     'C007',
+    'ctrl2015':   'C009',
+    'ocx':        'C011',
 }
 if exp in exp_map:
-    set_counter_base, time_range = exp_map[exp]
+    set_counter_base = exp_map[exp]
 else:
     sys.exit(f'Error: unknown experiment {exp}')
 
@@ -130,14 +131,24 @@ except Exception:
 # READ SCALARS (function of time only).
 # ----------------------------------------------------------------------
 try:
-    iareafc = cismfilescalar.variables['iareaf'][1::]                # area covered by floating ice (m^2)
-    iareagc = cismfilescalar.variables['iareag'][1::]                # area covered by grounded ice (m^2)
-    imassc  = cismfilescalar.variables['imass'][1::]                 # total ice mass (kg)
-    imafc   = cismfilescalar.variables['imass_above_flotation'][1::] # total ice mass above flotation(kg)
+    # Keep all time entries: the first CISM output is the end of the first
+    # simulation year (e.g. 1970 for historical), so nothing is dropped.
+    iareafc = cismfilescalar.variables['iareaf'][:]                  # area covered by floating ice (m^2)
+    iareagc = cismfilescalar.variables['iareag'][:]                  # area covered by grounded ice (m^2)
+    imassc  = cismfilescalar.variables['imass'][:]                   # total ice mass (kg)
+    imafc   = cismfilescalar.variables['imass_above_flotation'][:]   # total ice mass above flotation(kg)
     timeS   = cismfilescalar.variables['time'][:]
 
     nt = len(timeS)
     print('nt=', nt)
+
+    # The time_range tag in the output filename is derived from the data:
+    # entry t (CISM year timeS[t]) covers nominal year timeS[t]-1, so the
+    # first/last nominal years are timeS[0]-1 / timeS[-1]-1. It therefore
+    # adjusts automatically when a run is extended by one year.
+    time_range = f"{int(timeS[0])-1}-{int(timeS[-1])-1}"
+    print('time_range =', time_range)
+
     tsmbfc  = cismfilescalar.variables['total_smb_flux'][:]      # total surface mass balance flux (kg.s^-1)
     tbmbfc  = cismfilescalar.variables['total_bmb_flux'][:]      # total basal mass balance flux (kg.s^-1)
     tbmltfc = cismfilescalar.variables['total_bmlt_float'][:]    # total basal mass balance flux for floating ice (kg.s^-1)
@@ -175,15 +186,20 @@ outField = ['lim', 'limnsw', 'iareagr', 'iareafl', 'tendacabf', 'tendlibmassbfgr
 fieldoverwrite = ['tendacabf', 'tendlibmassbfgr', 'tendlibmassbffl',
                   'tendlicalvf', 'tendlifmassbf', 'tendligroundf']
 
+# CISM writes the first output at the end of the first simulation year:
+# entry t (timeS[t]) is the state / year-mean of nominal year timeS[t]-1.
+# ST fields are stamped Jan 1 of timeS[t] (end of the nominal year),
+# FL fields (year-means) are assigned to the middle of the nominal year,
+# Jul 1 of timeS[t]-1.
 timeST = np.zeros(nt)
-timeFL = np.zeros(nt-1)
+timeFL = np.zeros(nt)
 
 
 for t in range(nt):
-    timeST[t] = days_since_1850(int(timeS[t]), 1, 1)  # time in days
+    timeST[t] = days_since_1850(int(timeS[t]), 1, 1)      # time in days
 
-for t in range(nt-1):
-    timeFL[t] = days_since_1850(int(timeS[t]), 7, 1)  # time in days
+for t in range(nt):
+    timeFL[t] = days_since_1850(int(timeS[t])-1, 7, 1)    # time in days
 
 
 # count = 0
@@ -202,9 +218,9 @@ for field in outField:
         ncid = Dataset(outfilenamescal, 'w')
         ncid.createDimension('time', None)
         time    = ncid.createVariable('time', 'f4', ('time'))
-        time[:] = timeST[1::]
+        time[:] = timeST[:]
 
-        # time[:] = (timeS[1::]-1850)*dayPerY # time in days
+        # time[:] = (timeS[:]-1850)*dayPerY # time in days
 
         time.units         = "days since 1850-01-01"
         time.calendar      = "standard"
@@ -266,36 +282,36 @@ for field in outField:
         time_bounds = ncid.createVariable('time_bounds', 'f4', ('time', 'bnds',))
         # time_bounds[:,0] = (timeS[0:-1]-1850)*dayPerY
         # time_bounds[:,1] = (timeS[0:-1]-1850)*dayPerY + dayPerY
-        time_bounds[:, 0] = timeST[0:-1]
-        time_bounds[:, 1] = timeS[1::]
+        time_bounds[:, 0] = np.array([days_since_1850(int(timeS[t])-1, 1, 1) for t in range(nt)])
+        time_bounds[:, 1] = timeST[:]
 
         if field in ['tendacabf']:
             tendacabf = ncid.createVariable(field, 'f4', ('time'))
             tendacabf.units         = 'kg s-1'
             tendacabf.long_name     = 'total SMB flux'
             tendacabf.standard_name = 'tendency_of_land_ice_mass_due_to_surface_mass_balance'
-            tendacabf[:] = (tsmbfc[1::] + tsmbfc[0:-1])/2.
+            tendacabf[:] = tsmbfc[:]
 
         if field in ['tendlibmassbfgr']:
             tendlibmassbfg = ncid.createVariable(field, 'f4', ('time'))
             tendlibmassbfg.units         = 'kg s-1'
             tendlibmassbfg.long_name     = 'Total BMB flux beneath grounded ice'
             tendlibmassbfg.standard_name = 'tendency_of_land_ice_mass_due_to_basal_mass_balance'
-            tendlibmassbfg[:] = (tbmbfc[1::] + tbmbfc[0:-1])/2. - (tbmltfc[1::] + tbmltfc[0:-1])/2.
+            tendlibmassbfg[:] = tbmbfc[:] - tbmltfc[:]
 
         if field in ['tendlibmassbffl']:
             tendlibmassbffl = ncid.createVariable(field, 'f4', ('time'))
             tendlibmassbffl.units         = 'kg s-1'
             tendlibmassbffl.long_name     = 'total BMB flux beneath floating ice'
             tendlibmassbffl.standard_name = 'tendency_of_land_ice_mass_due_to_basal_mass_balance'
-            tendlibmassbffl[:] = (tbmltfc[1::] + tbmltfc[0:-1])/2.
+            tendlibmassbffl[:] = tbmltfc[:]
 
         if field in ['tendlicalvf']:
             tendlicalvf = ncid.createVariable(field, 'f4', ('time'))
             tendlicalvf.units         = 'kg s-1'
             tendlicalvf.long_name     = 'total calving flux'
             tendlicalvf.standard_name = 'tendency_of_land_ice_mass_due_to_calving'
-            tendlicalvf[:] = (tcalfc[1::] + tcalfc[0:-1])/2.
+            tendlicalvf[:] = tcalfc[:]
 
         if field in ['tendlifmassbf']:
             # Not written: source variable not available in NORCE output
@@ -303,7 +319,7 @@ for field in outField:
             tendlifmassbf.units         = 'kg s-1'
             tendlifmassbf.long_name     = 'total calving and ice front melting flux'
             tendlifmassbf.standard_name = 'tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting'
-            tendlifmassbf[:] = (tlatmeltfc[1::] + tlatmeltfc[0:-1])/2.  # zeros - not available in NORCE output
+            tendlifmassbf[:] = tlatmeltfc[:]  # zeros - not available in NORCE output
 
         if field in ['tendligroundf']:
             # Not written: source variable not available in NORCE output
@@ -311,7 +327,7 @@ for field in outField:
             tendligroundf.units         = 'kg s-1'
             tendligroundf.long_name     = 'total grounding line flux'
             tendligroundf.standard_name = 'tendency_of_grounded_ice_mass'
-            tendligroundf[:] = (tglfc[1::] + tglfc[0:-1])/2.  # zeros - not available in NORCE output
+            tendligroundf[:] = tglfc[:]  # zeros - not available in NORCE output
 
         ncid.group = 'NORCE'
         ncid.model = 'CISM3'
