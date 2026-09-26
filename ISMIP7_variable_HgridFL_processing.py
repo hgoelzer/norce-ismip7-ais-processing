@@ -63,6 +63,10 @@ RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
 
+# Output experiment name: the data request (and compliance checker) uses
+# 'ctrl' for the control run, while the input directory is named ctrl2015.
+exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
 # ----------------------------------------------------------------------
@@ -162,23 +166,24 @@ time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-# ice_mask = nidsrc['ice_mask'][:, :, :]  # not available in NORCE output
-ice_mask = nidsrc['ice_domain_mask'][:, :, :]
+ice_mask = nidsrc['ice_mask'][:, :, :]
 f_ground = nidsrc['f_ground_cell'][:, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
 
 # acab_dst         = nidsrc['acab_applied_tavg'][:, :, :]  # not available in NORCE output
 acab_dst         = nidsrc['acab_applied'][:, :, :]
-# basal_flux_dst   = nidsrc['basal_mbal_flux_tavg'][:, :, :]  # not available in NORCE output
-basal_flux_dst   = np.zeros_like(nidsrc['dthck_dt'][:, :, :])
 dthckdt_dst      = nidsrc['dthck_dt'][:, :, :]
-# calving_flux_dst = nidsrc['calving_flux_tavg'][:, :, :]  # not available in NORCE output
-calving_flux_dst = nidsrc['calving_rate'][:, :, :]
 # latmelt_dst      = nidsrc['latmelt_flux_tavg'][:, :, :]  # not available in NORCE output
 latmelt_dst      = np.zeros_like(nidsrc['dthck_dt'][:, :, :])
 
 nidsrc.close()
+
+# The time-mean flux variables are written to a separate output_tavg.nc file
+nidtavg = Dataset(f"{run_dir}/output_tavg.nc", 'r')
+basal_flux_dst   = nidtavg['basal_mbal_flux_tavg'][:, :, :]
+calving_flux_dst = nidtavg['calving_flux_tavg'][:, :, :]
+nidtavg.close()
 
 nt = len(time_dst)
 nx = len(x_dst)
@@ -244,15 +249,8 @@ print(time_dst)
 # ----------------------------------------------------------------------
 for field in fieldFL:
 
-    # Skip fields whose source variable is not available in the NORCE output.
-    # Remove this skip (and switch the commented reads above to the NCAR
-    # variables) when the variables become available in the NORCE output.
-    if field in ['libmassbfgr', 'libmassbffl', 'licalvf']:
-        print('Skipping', field, ': source variable not available in NORCE output')
-        continue
-
     # Create the field output file.
-    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
+    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(dstFile):
@@ -298,35 +296,41 @@ for field in fieldFL:
         acabf[:, :, :] = acab_dst[:, :, :]*rhoi/sPerY
 
     if field in ['libmassbfgr']:
-        # Not written: source variable not available in NORCE output (skipped in the loop above)
         libmassbfgr = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         libmassbfgr.units         = 'kg m-2 s-1'
         libmassbfgr.long_name     = 'basal mass balance flux beneath grounded ice'
         libmassbfgr.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbfgr[:, :, :] = basal_flux_dst[:, :, :]*f_ground[:, :, :]
+        # The data request defines this variable only where there is grounded
+        # ice; cells without grounded ice hold the fill value.
+        libmassbfgr[:, :, :] = np.where(f_ground[:, :, :] > 0,
+                                        basal_flux_dst[:, :, :]*f_ground[:, :, :],
+                                        netCDF4.default_fillvals['f4'])
 
     if field in ['libmassbffl']:
-        # Not written: source variable not available in NORCE output (skipped in the loop above)
         libmassbffl = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         libmassbffl.units         = 'kg m-2 s-1'
         libmassbffl.long_name     = 'basal mass balance flux beneath floating ice'
         libmassbffl.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbffl[:, :, :] = basal_flux_dst[:, :, :]*f_float[:, :, :]
+        # The data request defines this variable only where there is floating
+        # ice; cells without floating ice hold the fill value.
+        libmassbffl[:, :, :] = np.where(f_float[:, :, :] > 0,
+                                        basal_flux_dst[:, :, :]*f_float[:, :, :],
+                                        netCDF4.default_fillvals['f4'])
 
     if field in ['dlithkdt']:
         dlithkdt = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         dlithkdt.units         = 'm s-1'
         dlithkdt.long_name     = 'ice thickness imbalance'
         dlithkdt.standard_name = 'tendency_of_land_ice_thickness'
-        dlithkdt[:, :, :] = dthckdt_dst[:, :, :]/sPerY
+        # The data request does not permit missing values in this variable:
+        # any masked/fill cells (e.g. where there is no ice) are set to 0.
+        dlithkdt[:, :, :] = np.ma.filled(dthckdt_dst[:, :, :]/sPerY, 0.0)
 
     if field in ['licalvf']:
-        # Not written: source variable not available in NORCE output (skipped in the loop above)
         licalvf = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         licalvf.units         = 'kg m-2 s-1'
         licalvf.long_name     = 'calving flux'
         licalvf.standard_name = 'land_ice_specific_mass_flux_due_to_calving'
-        # licalvf[:,:,:] = calving_flux_dst[:,:,:]
         # Temporary fix for positive values
         licalvf[:, :, :] = np.where(calving_flux_dst[:, :, :] > 0, 0, calving_flux_dst[:, :, :])
 
@@ -335,7 +339,9 @@ for field in fieldFL:
         lifmassbf.units         = 'kg m-2 s-1'
         lifmassbf.long_name     = 'loss of ice mass resulting from ice front melting'
         lifmassbf.standard_name = 'land_ice_specific_mass_flux_due_to_ice_front_melting'
-        lifmassbf[:, :, :] = latmelt_dst[:, :, :]  # zeros - latmelt not available in NORCE output
+        # The data request does not permit missing values in this variable:
+        # any masked/fill cells (e.g. where there is no ice) are set to 0.
+        lifmassbf[:, :, :] = np.ma.filled(latmelt_dst[:, :, :], 0.0)  # zeros - latmelt not available in NORCE output
 
 
     if field in ['ligroundf']:

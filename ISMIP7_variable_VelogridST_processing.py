@@ -64,6 +64,10 @@ RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
 
+# Output experiment name: the data request (and compliance checker) uses
+# 'ctrl' for the control run, while the input directory is named ctrl2015.
+exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
 # ----------------------------------------------------------------------
@@ -115,10 +119,10 @@ if exp == 'ocx':
 else:
     run_dir = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
 
-# NOTE: There is no separate velo.nc file in the NORCE output. All
-# variables are stored in the single output.nc file. However, output.nc
-# does not contain uvel_mean, vvel_mean and btract (see below).
+# NOTE: There is no separate velo.nc file in the NORCE output. The velocity
+# variables uvel_mean, vvel_mean and btract are stored in output_g0.nc.
 fileVar = f"{run_dir}/output.nc"
+fileVarVel = f"{run_dir}/output_g0.nc"
 
 
 fieldVel = ['xvelmean', 'yvelmean', 'strbasemag']
@@ -152,20 +156,24 @@ time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
+# Ice mask on the destination (x1/y1) grid; used to mask the output
+# variables, which the data request defines only where there is ice.
+ice_mask = nidsrc['ice_mask'][:, :, :]
+
 x0_src = nidsrc['x0'][:]
 y0_src = nidsrc['y0'][:]
 
-# NOTE: The NORCE output (output.nc) does not contain the velocity
-# variables uvel_mean, vvel_mean and btract of the NCAR velo.nc file.
-# The reads are therefore commented out and the corresponding fields
-# are skipped in the processing loop below. Switch the commented reads
-# back when the variables become available in the NORCE output.
-# uvel_mean_x0 = nidsrc['uvel_mean'][1::, :, :]  # not available in NORCE output
-# vvel_mean_x0 = nidsrc['vvel_mean'][1::, :, :]  # not available in NORCE output
-# btract_x0 = nidsrc['btract'][1::, :, :]  # not available in NORCE output
-uvel_mean_x0 = None
-vvel_mean_x0 = None
-btract_x0 = None
+nidsrc.close()
+
+# The velocity variables uvel_mean, vvel_mean and btract are stored in
+# output_g0.nc (on the x0/y0 grid, same time axis as output.nc).
+nidvel = Dataset(fileVarVel, 'r')
+uvel_mean_x0 = nidvel['uvel_mean'][:, :, :]
+vvel_mean_x0 = nidvel['vvel_mean'][:, :, :]
+btract_x0 = nidvel['btract'][:, :, :]
+x0_src = nidvel['x0'][:]
+y0_src = nidvel['y0'][:]
+nidvel.close()
 
 nt = len(time_dst)
 nx = len(x_dst)
@@ -173,9 +181,6 @@ ny = len(y_dst)
 
 nx0 = len(x0_src)
 ny0 = len(y0_src)
-
-
-nidsrc.close()
 
 # The time_range tag in the output filename is derived from the data:
 # entry t (CISM year time_dst[t]) covers nominal year time_dst[t]-1, so the
@@ -245,7 +250,7 @@ for field in fieldVel:
         continue
 
     # Create the field output file.
-    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
+    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(dstFile):
@@ -310,7 +315,11 @@ for field in fieldVel:
         xvelmean.units         = 'm s-1'
         xvelmean.long_name     = 'mean velocity in x'
         xvelmean.standard_name = 'land_ice_vertical_mean_x_velocity'
-        xvelmean[:, :, :] = var_dst[:, :, :]/sPerY
+        # The data request defines this variable only where there is ice;
+        # cells without ice hold the fill value.
+        xvelmean[:, :, :] = np.where(ice_mask[:, :, :] > 0,
+                                     var_dst[:, :, :]/sPerY,
+                                     netCDF4.default_fillvals['f4'])
         del var_dst
 
     if field in ['yvelmean']:
@@ -318,7 +327,11 @@ for field in fieldVel:
         yvelmean.units         = 'm s-1'
         yvelmean.long_name     = 'mean velocity in y'
         yvelmean.standard_name = 'land_ice_vertical_mean_y_velocity'
-        yvelmean[:, :, :] = var_dst[:, :, :]/sPerY
+        # The data request defines this variable only where there is ice;
+        # cells without ice hold the fill value.
+        yvelmean[:, :, :] = np.where(ice_mask[:, :, :] > 0,
+                                     var_dst[:, :, :]/sPerY,
+                                     netCDF4.default_fillvals['f4'])
         del var_dst
 
     if field in ['strbasemag']:
@@ -326,7 +339,11 @@ for field in fieldVel:
         strbasemag.units         = 'Pa'
         strbasemag.long_name     = 'basal drag'
         strbasemag.standard_name = 'land_ice_basal_drag'
-        strbasemag[:, :, :] = var_dst[:, :, :]
+        # The data request defines this variable only where there is ice;
+        # cells without ice hold the fill value.
+        strbasemag[:, :, :] = np.where(ice_mask[:, :, :] > 0,
+                                       var_dst[:, :, :],
+                                       netCDF4.default_fillvals['f4'])
         del var_dst
 
 

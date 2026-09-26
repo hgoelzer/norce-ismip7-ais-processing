@@ -62,6 +62,10 @@ RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
 
+# Output experiment name: the data request (and compliance checker) uses
+# 'ctrl' for the control run, while the input directory is named ctrl2015.
+exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
 # ----------------------------------------------------------------------
@@ -147,8 +151,7 @@ time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-# ice_mask = nidsrc['ice_mask'][:, :, :]  # not available in NORCE output
-ice_mask = nidsrc['ice_domain_mask'][:, :, :]
+ice_mask = nidsrc['ice_mask'][:, :, :]
 f_ground = nidsrc['f_ground_cell'][:, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
@@ -190,7 +193,7 @@ print(time_dst)
 # ----------------------------------------------------------------------
 for field in fieldST:
     # Create the field output file.
-    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
+    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(dstFile):

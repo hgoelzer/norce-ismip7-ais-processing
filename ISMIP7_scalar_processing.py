@@ -50,6 +50,10 @@ RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
 
+# Output experiment name: the data request (and compliance checker) uses
+# 'ctrl' for the control run, while the input directory is named ctrl2015.
+exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
 # ----------------------------------------------------------------------
@@ -205,7 +209,7 @@ for t in range(nt):
 # count = 0
 for field in outField:
     # Create the field output file.
-    outfilenamescal = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
+    outfilenamescal = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(outfilenamescal):
@@ -229,28 +233,28 @@ for field in outField:
         time.standard_name = "time"
 
         if field in ['lim']:
-            lim = ncid.createVariable(field, 'f4', ('time'))
+            lim = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             lim.units         = 'kg'
             lim.long_name     = 'total ice mass'
             lim.standard_name = 'land_ice_mass'
             lim[:] = imassc[:]
 
         if field in ['limnsw']:
-            limnsw = ncid.createVariable(field, 'f4', ('time'))
+            limnsw = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             limnsw.units         = 'kg'
             limnsw.long_name     = 'mass above flotation'
             limnsw.standard_name = 'land_ice_mass_not_displacing_sea_water'
             limnsw[:] = imafc[:]
 
         if field in ['iareagr']:
-            iareagr = ncid.createVariable(field, 'f4', ('time'))
+            iareagr = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             iareagr.units         = 'm^2'
             iareagr.long_name     = 'grounded ice area'
             iareagr.standard_name = 'grounded_ice_sheet_area'
             iareagr[:] = iareagc[:]
 
         if field in ['iareafl']:
-            iareafl = ncid.createVariable(field, 'f4', ('time'))
+            iareafl = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             iareafl.units         = 'm^2'
             iareafl.long_name     = 'floating ice area'
             iareafl.standard_name = 'floating_ice_shelf_area'
@@ -286,28 +290,28 @@ for field in outField:
         time_bounds[:, 1] = timeST[:]
 
         if field in ['tendacabf']:
-            tendacabf = ncid.createVariable(field, 'f4', ('time'))
+            tendacabf = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendacabf.units         = 'kg s-1'
             tendacabf.long_name     = 'total SMB flux'
             tendacabf.standard_name = 'tendency_of_land_ice_mass_due_to_surface_mass_balance'
             tendacabf[:] = tsmbfc[:]
 
         if field in ['tendlibmassbfgr']:
-            tendlibmassbfg = ncid.createVariable(field, 'f4', ('time'))
+            tendlibmassbfg = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendlibmassbfg.units         = 'kg s-1'
             tendlibmassbfg.long_name     = 'Total BMB flux beneath grounded ice'
             tendlibmassbfg.standard_name = 'tendency_of_land_ice_mass_due_to_basal_mass_balance'
             tendlibmassbfg[:] = tbmbfc[:] - tbmltfc[:]
 
         if field in ['tendlibmassbffl']:
-            tendlibmassbffl = ncid.createVariable(field, 'f4', ('time'))
+            tendlibmassbffl = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendlibmassbffl.units         = 'kg s-1'
             tendlibmassbffl.long_name     = 'total BMB flux beneath floating ice'
             tendlibmassbffl.standard_name = 'tendency_of_land_ice_mass_due_to_basal_mass_balance'
             tendlibmassbffl[:] = tbmltfc[:]
 
         if field in ['tendlicalvf']:
-            tendlicalvf = ncid.createVariable(field, 'f4', ('time'))
+            tendlicalvf = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendlicalvf.units         = 'kg s-1'
             tendlicalvf.long_name     = 'total calving flux'
             tendlicalvf.standard_name = 'tendency_of_land_ice_mass_due_to_calving'
@@ -315,7 +319,7 @@ for field in outField:
 
         if field in ['tendlifmassbf']:
             # Not written: source variable not available in NORCE output
-            tendlifmassbf = ncid.createVariable(field, 'f4', ('time'))
+            tendlifmassbf = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendlifmassbf.units         = 'kg s-1'
             tendlifmassbf.long_name     = 'total calving and ice front melting flux'
             tendlifmassbf.standard_name = 'tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting'
@@ -323,7 +327,7 @@ for field in outField:
 
         if field in ['tendligroundf']:
             # Not written: source variable not available in NORCE output
-            tendligroundf = ncid.createVariable(field, 'f4', ('time'))
+            tendligroundf = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])
             tendligroundf.units         = 'kg s-1'
             tendligroundf.long_name     = 'total grounding line flux'
             tendligroundf.standard_name = 'tendency_of_grounded_ice_mass'
