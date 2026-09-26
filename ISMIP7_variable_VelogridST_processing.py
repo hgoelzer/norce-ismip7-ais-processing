@@ -9,6 +9,11 @@ Converted from ISMIP7_variable_VelogridST_processing.ipynb to a plain Python scr
 import numpy as np
 from netCDF4 import Dataset
 import sys, os
+import argparse
+
+# Top-level configuration (paths, interpreter)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import PATH_EXP, DST_PATH
 import netCDF4
 from pathlib import Path
 
@@ -40,41 +45,87 @@ sPerY = 31536000.
 
 fill_value = netCDF4.default_fillvals['f4']
 
-ESM_id = 'CESM2-WACCM'
-ESM_num = 'm01'
-RCM_num = 'r01'
-ISM_member_id = 'm001'
+# ----------------------------------------------------------------------
+# Command line arguments (defaults reproduce the previous hard-coded run)
+# ----------------------------------------------------------------------
+parser = argparse.ArgumentParser(description='ISMIP7 AIS velocity-grid state variable processing (Velogrid ST)')
+parser.add_argument('--exp',       default='ssp585', help='Experiment name (e.g. historical, ssp126, ssp370, ssp585, ctrl2015, ocx)')
+parser.add_argument('--ESM_num',   default='m01',    help='ESM ensemble member (m01, m02); ocx run uses r01 only')
+parser.add_argument('--RCM_num',   default='r01',    help='RCM/ISM configuration number')
+parser.add_argument('--path_exp',  default=PATH_EXP,
+                    help='Path to the ensemble_v1 run directory')
+parser.add_argument('--dstPath',   default=DST_PATH,
+                    help='Base path for output')
+args = parser.parse_args()
+
+exp      = args.exp
+ESM_num  = args.ESM_num
+RCM_num  = args.RCM_num
+path_exp = args.path_exp
+dstPath  = args.dstPath
+
+# ----------------------------------------------------------------------
+# Derive ESM_id / ISM_member_id from the ESM ensemble member
+# ----------------------------------------------------------------------
+ESM_map = {
+    'm01': ('CESM2-WACCM', 'm001'),
+    'm02': ('MRI-ESM2-0',  'm002'),
+}
+if exp == 'ocx':
+    # OCX doesn't have an ESM; use ERA
+    ESM_id, ISM_member_id = 'ERA', 'm001'
+elif ESM_num in ESM_map:
+    ESM_id, ISM_member_id = ESM_map[ESM_num]
+else:
+    sys.exit(f'Error: unknown ESM_num {ESM_num}')
+
 forcing_member_id = 'f001'
-# exp = 'historical'
-exp = 'ssp585'
-res = '8000'
 
-res_km_str = str(int(int(res)/1000))
+# ----------------------------------------------------------------------
+# Experiment lookup: set_counter and time_range for the 11 CORE runs
+# (m01/m02 pairs share the same set_counter; ocx is C011)
+# ----------------------------------------------------------------------
+exp_map = {
+    'historical': ('C001', '1970-2014'),
+    'ssp370':     ('C003', '2015-2100'),
+    'ssp126':     ('C005', '2015-2300'),
+    'ssp585':     ('C007', '2015-2300'),
+    'ctrl2015':   ('C009', '2015-2300'),
+    'ocx':        ('C011', '1979-2025'),
+}
+if exp in exp_map:
+    set_counter_base, time_range = exp_map[exp]
+else:
+    sys.exit(f'Error: unknown experiment {exp}')
 
-path_exp = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
+# m01/m02 runs get consecutive set_counters (e.g. ssp126 -> C005/C006)
+if exp == 'ocx':
+    set_counter = set_counter_base
+elif ESM_num == 'm01':
+    set_counter = set_counter_base
+elif ESM_num == 'm02':
+    set_counter = 'C%03d' % (int(set_counter_base[1:]) + 1)
+else:
+    sys.exit(f'Error: unknown ESM_num {ESM_num}')
+
+# OCX run directory has no _{ESM_num}_{RCM_num} suffix
+if exp == 'ocx':
+    run_dir = f"{path_exp}/ocx_{RCM_num}"
+else:
+    run_dir = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
 
 # NOTE: There is no separate velo.nc file in the NORCE output. All
 # variables are stored in the single output.nc file. However, output.nc
 # does not contain uvel_mean, vvel_mean and btract (see below).
-fileVar = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/output.nc"
+fileVar = f"{run_dir}/output.nc"
 
 
 fieldVel = ['xvelmean', 'yvelmean', 'strbasemag']
 
 
-if exp in ['historical']:
-    set_counter = 'C001'
-    time_range = '2000-2014'
-
-if exp in ['ssp585']:
-    set_counter = 'C007'
-    time_range = '2015-2300'
-
-
 # ----------------------------------------------------------------------
 # Output directory
 # ----------------------------------------------------------------------
-dstPath = f"/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing"
 dstDir = f"{dstPath}/{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
 
 if os.path.isdir(dstDir):
@@ -104,10 +155,11 @@ y0_src = nidsrc['y0'][:]
 # NOTE: The NORCE output (output.nc) does not contain the velocity
 # variables uvel_mean, vvel_mean and btract of the NCAR velo.nc file.
 # The reads are therefore commented out and the corresponding fields
-# are skipped in the processing loop below.
-# uvel_mean_x0 = nidsrc['uvel_mean'][1::, :, :]
-# vvel_mean_x0 = nidsrc['vvel_mean'][1::, :, :]
-# btract_x0 = nidsrc['btract'][1::, :, :]
+# are skipped in the processing loop below. Switch the commented reads
+# back when the variables become available in the NORCE output.
+# uvel_mean_x0 = nidsrc['uvel_mean'][1::, :, :]  # not available in NORCE output
+# vvel_mean_x0 = nidsrc['vvel_mean'][1::, :, :]  # not available in NORCE output
+# btract_x0 = nidsrc['btract'][1::, :, :]  # not available in NORCE output
 uvel_mean_x0 = None
 vvel_mean_x0 = None
 btract_x0 = None
