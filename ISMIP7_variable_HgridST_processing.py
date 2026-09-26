@@ -29,7 +29,7 @@ def days_since_1850(year, month, day):
 # Strings for file naming convention:
 # ----------------------------------------------------------------------
 domain_id = 'AIS'  # Ice Sheet name
-source_id = 'NCAR'
+source_id = 'NORCE'
 ism_id = 'CISM'
 set_id = 'CORE'
 
@@ -39,6 +39,8 @@ rhoi = 917
 fill_value = netCDF4.default_fillvals['f4']
 
 ESM_id = 'CESM2-WACCM'
+ESM_num = 'm01'
+RCM_num = 'r01'
 ISM_member_id = 'm001'
 forcing_member_id = 'f001'
 # exp = 'historical'
@@ -47,9 +49,9 @@ res = '8000'
 
 res_km_str = str(int(int(res)/1000))
 
-path_exp = '/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/AIS/'
+path_exp = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
 
-fileVar = f"{path_exp}{ESM_id}/{exp}/out_Antarctica_{res_km_str}km.thk.nc"
+fileVar = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/output.nc"
 
 
 fieldST = ['lithk', 'orog', 'topg', 'base', 'sftgif', 'sftgrf', 'sftflf']
@@ -67,8 +69,8 @@ if exp in ['ssp585']:
 # ----------------------------------------------------------------------
 # Output directory
 # ----------------------------------------------------------------------
-dstPath = f"/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/{domain_id}/data_processing/"
-dstDir = f"{dstPath}{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
+dstPath = f"/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing"
+dstDir = f"{dstPath}/{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
 
 if os.path.isdir(dstDir):
     print("The output directory already exists")
@@ -91,7 +93,8 @@ time_dst = nidsrc['time'][1::]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-ice_mask = nidsrc['ice_mask'][1::, :, :]
+# ice_mask = nidsrc['ice_mask'][1::, :, :]  # not available in NORCE output
+ice_mask = nidsrc['ice_domain_mask'][1::, :, :]
 f_ground = nidsrc['f_ground_cell'][1::, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
@@ -216,9 +219,9 @@ for field in fieldST:
         sftflf[:, :, :] = f_float[:, :, :]
 
 
-    ncid.group = 'NCAR'
+    ncid.group = 'NORCE'
     ncid.model = 'CISM3'
-    ncid.contact_name = 'Gunter Leguy and Bill Lipscomb'
-    ncid.contact_email = 'gunterl@ucar.edu and lipscomb@ucar.edu'
+    ncid.contact_name = 'Heiko Goelzer'
+    ncid.contact_email = 'heig@norceresearch.no'
     ncid.crs = 'epsg:3031'
     ncid.close()

@@ -31,7 +31,7 @@ def days_since_1850(year, month, day):
 # Strings for file naming convention:
 # ----------------------------------------------------------------------
 domain_id = 'AIS'  # Ice Sheet name
-source_id = 'NCAR'
+source_id = 'NORCE'
 ism_id = 'CISM'
 set_id = 'CORE'
 
@@ -41,6 +41,8 @@ sPerY = 31536000.
 fill_value = netCDF4.default_fillvals['f4']
 
 ESM_id = 'CESM2-WACCM'
+ESM_num = 'm01'
+RCM_num = 'r01'
 ISM_member_id = 'm001'
 forcing_member_id = 'f001'
 # exp = 'historical'
@@ -49,9 +51,12 @@ res = '8000'
 
 res_km_str = str(int(int(res)/1000))
 
-path_exp = '/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/AIS/'
+path_exp = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
 
-fileVar = f"{path_exp}{ESM_id}/{exp}/out_Antarctica_{res_km_str}km.velo.nc"
+# NOTE: There is no separate velo.nc file in the NORCE output. All
+# variables are stored in the single output.nc file. However, output.nc
+# does not contain uvel_mean, vvel_mean and btract (see below).
+fileVar = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/output.nc"
 
 
 fieldVel = ['xvelmean', 'yvelmean', 'strbasemag']
@@ -69,8 +74,8 @@ if exp in ['ssp585']:
 # ----------------------------------------------------------------------
 # Output directory
 # ----------------------------------------------------------------------
-dstPath = f"/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/{domain_id}/data_processing/"
-dstDir = f"{dstPath}{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
+dstPath = f"/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing"
+dstDir = f"{dstPath}/{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
 
 if os.path.isdir(dstDir):
     print("The output directory already exists")
@@ -96,9 +101,16 @@ y_dst = nidsrc['y1'][:]
 x0_src = nidsrc['x0'][:]
 y0_src = nidsrc['y0'][:]
 
-uvel_mean_x0 = nidsrc['uvel_mean'][1::, :, :]
-vvel_mean_x0 = nidsrc['vvel_mean'][1::, :, :]
-btract_x0 = nidsrc['btract'][1::, :, :]
+# NOTE: The NORCE output (output.nc) does not contain the velocity
+# variables uvel_mean, vvel_mean and btract of the NCAR velo.nc file.
+# The reads are therefore commented out and the corresponding fields
+# are skipped in the processing loop below.
+# uvel_mean_x0 = nidsrc['uvel_mean'][1::, :, :]
+# vvel_mean_x0 = nidsrc['vvel_mean'][1::, :, :]
+# btract_x0 = nidsrc['btract'][1::, :, :]
+uvel_mean_x0 = None
+vvel_mean_x0 = None
+btract_x0 = None
 
 nt = len(time_dst)
 nx = len(x_dst)
@@ -156,6 +168,20 @@ nameCISMvel = ['uvel_mean', 'vvel_mean', 'btract']
 
 count = 0
 for field in fieldVel:
+
+    # Select the source variable for this field
+    if field in ['xvelmean']:
+        var_src = uvel_mean_x0
+    if field in ['yvelmean']:
+        var_src = vvel_mean_x0
+    if field in ['strbasemag']:
+        var_src = btract_x0
+
+    # Skip fields whose source variable is not available in the NORCE output
+    if var_src is None:
+        print('Skipping', field, ': source variable not available in NORCE output')
+        continue
+
     # Create the field output file.
     dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
 
@@ -189,13 +215,6 @@ for field in fieldVel:
     y[:] = y_dst[:]
 
     var_dst = np.zeros((nt, ny, nx))
-
-    if field in ['xvelmean']:
-        var_src = uvel_mean_x0
-    if field in ['yvelmean']:
-        var_src = vvel_mean_x0
-    if field in ['strbasemag']:
-        var_src = btract_x0
 
     var_src[:, :, :] = prep_data3d_for_interp(time_dst, y0_src, x0_src, var_src[:, :, :])
 
@@ -249,10 +268,10 @@ for field in fieldVel:
         del var_dst
 
 
-    ncid.group = 'NCAR'
+    ncid.group = 'NORCE'
     ncid.model = 'CISM3'
-    ncid.contact_name = 'Gunter Leguy and Bill Lipscomb'
-    ncid.contact_email = 'gunterl@ucar.edu and lipscomb@ucar.edu'
+    ncid.contact_name = 'Heiko Goelzer'
+    ncid.contact_email = 'heig@norceresearch.no'
     ncid.crs = 'epsg:3031'
     ncid.close()
 

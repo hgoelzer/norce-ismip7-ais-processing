@@ -29,7 +29,7 @@ def days_since_1850(year, month, day):
 # Strings for file naming convention:
 # ----------------------------------------------------------------------
 domain_id = 'AIS'  # Ice Sheet name
-source_id = 'NCAR'
+source_id = 'NORCE'
 ism_id = 'CISM'
 set_id = 'CORE'
 
@@ -40,6 +40,8 @@ rhoi = 917
 fill_value = netCDF4.default_fillvals['f4']
 
 ESM_id = 'CESM2-WACCM'
+ESM_num = 'm01'
+RCM_num = 'r01'
 ISM_member_id = 'm001'
 forcing_member_id = 'f001'
 # exp = 'historical'
@@ -48,10 +50,10 @@ res = '8000'
 
 res_km_str = str(int(int(res)/1000))
 
-path_exp = '/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/AIS/'
+path_exp = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
 
-fileVar = f"{path_exp}{ESM_id}/{exp}/out_Antarctica_{res_km_str}km.thk.nc"
-fileVarVel = f"{path_exp}{ESM_id}/{exp}/out_Antarctica_{res_km_str}km.velo.nc"
+fileVar = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/output.nc"
+fileVarVel = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/output.nc"
 
 
 fieldFL = ['acabf', 'libmassbfgr', 'libmassbffl', 'dlithkdt',
@@ -82,8 +84,8 @@ if exp in ['ssp585']:
 # ----------------------------------------------------------------------
 # Output directory
 # ----------------------------------------------------------------------
-dstPath = f"/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/{domain_id}/data_processing/"
-dstDir = f"{dstPath}{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
+dstPath = f"/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing"
+dstDir = f"{dstPath}/{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
 
 if os.path.isdir(dstDir):
     print("The output directory already exists")
@@ -106,16 +108,16 @@ time_dst = nidsrc['time'][:]
 x_dst = nidsrc['x1'][:]
 y_dst = nidsrc['y1'][:]
 
-ice_mask = nidsrc['ice_mask'][1::, :, :]
+ice_mask = nidsrc['ice_domain_mask'][1::, :, :]
 f_ground = nidsrc['f_ground_cell'][1::, :, :]*ice_mask
 f_float = (1-f_ground)*ice_mask
 
 
-acab_dst         = nidsrc['acab_applied_tavg'][1::, :, :]
-basal_flux_dst   = nidsrc['basal_mbal_flux_tavg'][1::, :, :]
+# acab_dst         = nidsrc['acab_applied_tavg'][1::, :, :]  # not available in NORCE output
+acab_dst         = nidsrc['acab_applied'][1::, :, :]
 dthckdt_dst      = nidsrc['dthck_dt'][1::, :, :]
-calving_flux_dst = nidsrc['calving_flux_tavg'][1::, :, :]
-latmelt_dst      = nidsrc['latmelt_flux_tavg'][1::, :, :]
+calving_flux_dst = nidsrc['calving_rate'][1::, :, :]
+latmelt_dst      = np.zeros_like(nidsrc['dthck_dt'][1::, :, :])  # not available in NORCE output
 
 thk_init = nidsrc['thk'][0:2, :, :]
 dthckdt_dst[0, :, :] = (thk_init[1, :, :]-thk_init[0, :, :])/(time_dst[1]-time_dst[0])
@@ -133,11 +135,11 @@ print(f"nt={nt}, ny={ny}, nx={nx}")
 # readListPrevExptString = [ 'licalvf', 'dlithkdt',  'acabf']
 if exp in ['historical']:
     # Need to read in the last time slice of the spin-up
-    filePrev = f"/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Spinup_input/Antarctica_{res_km_str}km.restart.spin.nc"
+    filePrev = f"{path_exp}/ctrl2015_{ESM_num}_{RCM_num}/restart_in.nc"
 
 else:
     # Need to read the last time slice of the historical
-    filePrev = f"{path_exp}{ESM_id}/historical/out_Antarctica_{res_km_str}km.thk.nc"
+    filePrev = f"{path_exp}/historical_{ESM_num}_{RCM_num}/output.nc"
 
 try:
     nidprev = Dataset(filePrev, 'r')
@@ -169,6 +171,12 @@ print(time_dst)
 # Main processing loop
 # ----------------------------------------------------------------------
 for field in fieldFL:
+
+    # Skip fields whose source variable is not available in the NORCE output
+    if field in ['libmassbfgr', 'libmassbffl', 'licalvf']:
+        print('Skipping', field, ': source variable not available in NORCE output')
+        continue
+
     # Create the field output file.
     dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
 
@@ -216,18 +224,12 @@ for field in fieldFL:
         acabf[:, :, :] = acab_dst[1::, :, :]*rhoi/sPerY
 
     if field in ['libmassbfgr']:
-        libmassbfgr = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
-        libmassbfgr.units         = 'kg m-2 s-1'
-        libmassbfgr.long_name     = 'basal mass balance flux beneath grounded ice'
-        libmassbfgr.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbfgr[:, :, :] = basal_flux_dst[1::, :, :]*f_ground[1::, :, :]
+        # Not available in NORCE output - skipped in the loop above
+        pass
 
     if field in ['libmassbffl']:
-        libmassbffl = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
-        libmassbffl.units         = 'kg m-2 s-1'
-        libmassbffl.long_name     = 'basal mass balance flux beneath floating ice'
-        libmassbffl.standard_name = 'land_ice_basal_specific_mass_balance_flux'
-        libmassbffl[:, :, :] = basal_flux_dst[1::, :, :]*f_float[1::, :, :]
+        # Not available in NORCE output - skipped in the loop above
+        pass
 
     if field in ['dlithkdt']:
         dlithkdt = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
@@ -237,20 +239,15 @@ for field in fieldFL:
         dlithkdt[:, :, :] = (dthckdt_dst[1:, :, :] + dthckdt_dst[0:-1, :, :])/2./sPerY
 
     if field in ['licalvf']:
-        licalvf = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
-        licalvf.units         = 'kg m-2 s-1'
-        licalvf.long_name     = 'calving flux'
-        licalvf.standard_name = 'land_ice_specific_mass_flux_due_to_calving'
-        # licalvf[:,:,:] = calving_flux_dst[1::,:,:]
-        # Temporary fix for positive values
-        licalvf[:, :, :] = np.where(calving_flux_dst[1::, :, :] > 0, 0, calving_flux_dst[1::, :, :])
+        # Not available in NORCE output - skipped in the loop above
+        pass
 
     if field in ['lifmassbf']:
         lifmassbf = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
         lifmassbf.units         = 'kg m-2 s-1'
         lifmassbf.long_name     = 'loss of ice mass resulting from ice front melting'
         lifmassbf.standard_name = 'land_ice_specific_mass_flux_due_to_ice_front_melting'
-        lifmassbf[:, :, :] = latmelt_dst[1::, :, :]
+        lifmassbf[:, :, :] = latmelt_dst[1::, :, :]  # zeros - not available in NORCE output
 
 
     if field in ['ligroundf']:
@@ -260,9 +257,9 @@ for field in fieldFL:
         ligroundf.standard_name = 'land_ice_specific_grounding_line_flux'
         ligroundf[:, :, :] = 0
 
-    ncid.group = 'NCAR'
+    ncid.group = 'NORCE'
     ncid.model = 'CISM3'
-    ncid.contact_name = 'Gunter Leguy and Bill Lipscomb'
-    ncid.contact_email = 'gunterl@ucar.edu and lipscomb@ucar.edu'
+    ncid.contact_name = 'Heiko Goelzer'
+    ncid.contact_email = 'heig@norceresearch.no'
     ncid.crs = 'epsg:3031'
     ncid.close()

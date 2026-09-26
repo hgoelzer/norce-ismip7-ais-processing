@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-ISMIP7 AIS scalar data processing (NCAR version)
+ISMIP7 AIS scalar data processing
 
-Converted from ISMIP7_scalar_processing_org.ipynb to a plain Python script.
+Converted from ISMIP7_scalar_processing.ipynb to a plain Python script.
 """
 
 # Import packages
@@ -19,7 +19,7 @@ from datetime import date, datetime
 # Strings for file naming convention:
 # ----------------------------------------------------------------------
 domain_id = 'AIS'  # Ice Sheet name
-source_id = 'NCAR'
+source_id = 'NORCE'
 ism_id = 'CISM'
 set_id = 'CORE'
 
@@ -27,6 +27,8 @@ dayPerY = 365.
 sPerY = 31556926.
 
 ESM_id = 'CESM2-WACCM'
+ESM_num = 'm01'
+RCM_num = 'r01'
 ISM_member_id = 'm001'
 forcing_member_id = 'f001'
 # exp = 'historical'
@@ -36,9 +38,9 @@ res = '8000'
 
 res_km_str = str(int(int(res)/1000))
 
-path_exp = '/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/AIS/'
+path_exp = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
 
-fileScalar = f"{path_exp}{ESM_id}/{exp}/out_Antarctica_{res_km_str}km.scalars.nc"
+fileScalar = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}/scalars.nc"
 
 
 if exp in ['historical']:
@@ -53,8 +55,8 @@ if exp in ['ssp585']:
 # ----------------------------------------------------------------------
 # Output directory
 # ----------------------------------------------------------------------
-dstPath = f"/glade/campaign/cesm/development/liwg/leguy/ISMIP7/Experiments/{domain_id}/data_processing/"
-dstDir = f"{dstPath}{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
+dstPath = f"/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing"
+dstDir = f"{dstPath}/{domain_id}/{source_id}/{ism_id}/{set_id}/{set_counter}/"
 
 if os.path.isdir(dstDir):
     print("The output directory already exists")
@@ -90,8 +92,8 @@ try:
     tbmbfc  = cismfilescalar.variables['total_bmb_flux'][:]      # total basal mass balance flux (kg.s^-1)
     tbmltfc = cismfilescalar.variables['total_bmlt_float'][:]    # total basal mass balance flux for floating ice (kg.s^-1)
     tcalfc  = cismfilescalar.variables['total_calving_flux'][:]  # total calving mass balance flux (kg.s^-1)
-    tglfc   = cismfilescalar.variables['total_gl_flux'][:]       # total grounding line flux(kg.s^-1)
-    tlatmeltfc = cismfilescalar.variables['total_latmelt_flux'][:]  # total lateral melt flux (kg.s^-1)
+    #tglfc   = cismfilescalar.variables['total_gl_flux'][:]       # total grounding line flux(kg.s^-1)
+    #tlatmeltfc  = cismfilescalar.variables['total_latmelt_flux'][:] # total lateral melt flux (kg.s^-1)
 except Exception:
     sys.exit('Error: The output file is missing needed scalar(s).')
 
@@ -186,10 +188,10 @@ for field in outField:
             iareafl.standard_name = 'floating_ice_shelf_area'
             iareafl[:] = iareafc[:]
 
-        ncid.group = 'NCAR'
+        ncid.group = 'NORCE'
         ncid.model = 'CISM3'
-        ncid.contact_name = 'Gunter Leguy and Bill Lipscomb'
-        ncid.contact_email = 'gunterl@ucar.edu and lipscomb@ucar.edu'
+        ncid.contact_name = 'Heiko Goelzer'
+        ncid.contact_email = 'heig@norceresearch.no'
         ncid.crs = 'epsg:3031'
         ncid.close()
 
@@ -243,24 +245,24 @@ for field in outField:
             tendlicalvf.standard_name = 'tendency_of_land_ice_mass_due_to_calving'
             tendlicalvf[:] = (tcalfc[1::] + tcalfc[0:-1])/2.
 
-        if field in ['tendlifmassbf']:
-            tendlifmassbf = ncid.createVariable(field, 'f4', ('time'))
-            tendlifmassbf.units         = 'kg s-1'
-            tendlifmassbf.long_name     = 'total calving and ice front melting flux'
-            tendlifmassbf.standard_name = 'tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting'
-            tendlifmassbf[:] = (tlatmeltfc[1::] + tlatmeltfc[0:-1])/2.
+        # if field in ['tendlifmassbf']:
+        #     tendlifmassbf = ncid.createVariable(field, 'f4', ('time'))
+        #     tendlifmassbf.units         = 'kg s-1'
+        #     tendlifmassbf.long_name     = 'total calving and ice front melting flux'
+        #     tendlifmassbf.standard_name = 'tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting'
+        #     tendlifmassbf[:] = (tlatmeltfc[1::] + tlatmeltfc[0:-1])/2.
 
-        if field in ['tendligroundf']:
-            tendligroundf = ncid.createVariable(field, 'f4', ('time'))
-            tendligroundf.units         = 'kg s-1'
-            tendligroundf.long_name     = 'total grounding line flux'
-            tendligroundf.standard_name = 'tendency_of_grounded_ice_mass'
-            tendligroundf[:] = (tglfc[1::] + tglfc[0:-1])/2.
+        # if field in ['tendligroundf']:
+        #     tendligroundf = ncid.createVariable(field, 'f4', ('time'))
+        #     tendligroundf.units         = 'kg s-1'
+        #     tendligroundf.long_name     = 'total grounding line flux'
+        #     tendligroundf.standard_name = 'tendency_of_grounded_ice_mass'
+        #     tendligroundf[:] = (tglfc[1::] + tglfc[0:-1])/2.
 
-        ncid.group = 'NCAR'
+        ncid.group = 'NORCE'
         ncid.model = 'CISM3'
-        ncid.contact_name = 'Gunter Leguy and Bill Lipscomb'
-        ncid.contact_email = 'gunterl@ucar.edu and lipscomb@ucar.edu'
+        ncid.contact_name = 'Heiko Goelzer'
+        ncid.contact_email = 'heig@norceresearch.no'
         ncid.crs = 'epsg:3031'
         ncid.close()
 
