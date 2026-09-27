@@ -283,11 +283,12 @@ for field in outField:
         # time[:] = (timeS[0:-1]-1850)*dayPerY + 182 # time in days
         time[:] = timeFL[:]
 
-        time_bounds = ncid.createVariable('time_bounds', 'f4', ('time', 'bnds',))
-        # time_bounds[:,0] = (timeS[0:-1]-1850)*dayPerY
-        # time_bounds[:,1] = (timeS[0:-1]-1850)*dayPerY + dayPerY
-        time_bounds[:, 0] = np.array([days_since_1850(int(timeS[t])-1, 1, 1) for t in range(nt)])
-        time_bounds[:, 1] = timeST[:]
+        # CF bounds variable: must be named 'time_bnds' to match time:bounds
+        time_bnds = ncid.createVariable('time_bnds', 'f4', ('time', 'bnds',))
+        # time_bnds[:,0] = (timeS[0:-1]-1850)*dayPerY
+        # time_bnds[:,1] = (timeS[0:-1]-1850)*dayPerY + dayPerY
+        time_bnds[:, 0] = np.array([days_since_1850(int(timeS[t])-1, 1, 1) for t in range(nt)])
+        time_bnds[:, 1] = timeST[:]
 
         if field in ['tendacabf']:
             tendacabf = ncid.createVariable(field, 'f4', ('time'), fill_value=netCDF4.default_fillvals['f4'])

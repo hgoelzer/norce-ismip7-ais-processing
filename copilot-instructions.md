@@ -37,12 +37,13 @@ Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF out
 2. **Masking per data request**: variables defined only where ice exists (libmassbfgr, libmassbffl, xvelmean, yvelmean, strbasemag) → `np.where(mask>0, val, netCDF4.default_fillvals['f4'])`. But **dlithkdt and lifmassbf permit NO missing values** → write 0 where there is no ice.
 3. **`exp_out` mapping**: checker requires lowercase `ctrl`; input dir is `ctrl2015` → `exp_out = 'ctrl' if exp == 'ctrl2015' else exp` in all 4 scripts (filenames use `exp_out`).
 4. **Time conventions**: ST variables → Jan 1 of year+1; FL variables → Jul 1 of year; `time_range` tag derived from data (`time_dst[t]-1`).
-5. **licalvf** has a temporary positive-clamp (`np.where(calving>0, 0, calving)`); **lifmassbf** is zeros — `latmelt_flux_tavg` not yet available in model output. NCAR-original reads are kept as comments for easy switchover.
-6. **netCDF4 auto-masking pitfall**: `v == fv` never matches on auto-masked reads. To verify fill placement use `nid.set_auto_mask(False)` + `np.isclose(v, fv, rtol=1e-5)`.
+5. **CF bounds naming**: the time bounds variable MUST be named `time_bnds` (matching `time:bounds = "time_bnds"`). It was previously created as `time_bounds`, which the checker flagged as an unexpected variable in every FL/scalar file with bounds. Fixed 2026-09-27 in `ISMIP7_scalar_processing.py` and `ISMIP7_variable_HgridFL_processing.py`.
+6. **licalvf** has a temporary positive-clamp (`np.where(calving>0, 0, calving)`); **lifmassbf** is zeros — `latmelt_flux_tavg` not yet available in model output. NCAR-original reads are kept as comments for easy switchover.
+7. **netCDF4 auto-masking pitfall**: `v == fv` never matches on auto-masked reads. To verify fill placement use `nid.set_auto_mask(False)` + `np.isclose(v, fv, rtol=1e-5)`.
 
 ## Compliance checker notes
 
-- Checker results (2026-09-27): all 11 cases pass. The former cosmetic base/topg consistency errors (C003–C010) are FIXED in `ISMIP7_variable_HgridST_processing.py` (see "base/topg cosmetic fix" below). Remaining known issues: C011 ocx: 27 'ERA' naming errors — expected for reanalysis forcing, left as is.
+- Checker results (2026-09-27): all 11 cases pass. The former cosmetic base/topg consistency errors (C003–C010) are FIXED in `ISMIP7_variable_HgridST_processing.py` (see "base/topg cosmetic fix" below). The former "unexpected variable 'time_bounds'" warnings are FIXED by renaming the bounds variable to `time_bnds` (see rule 5). Remaining known issues: (a) C011 ocx: 27 'ERA' naming errors — expected for reanalysis forcing, left as is; (b) warning "lithk > 0 where sftgif is 0" in all runs — pre-existing CISM behavior (thin margin ice below the ~0.5 m mask threshold, max 0.5 m), warning-only, accepted.
 - **base/topg cosmetic fix** (in `ISMIP7_variable_HgridST_processing.py`, applied before writing base/orog):
   - Case 1: where `sftgrf == 1` (wholly grounded) and `|lsurf − topg| > 0.009` → `base = topg`.
   - Case 2: where `sftflf == 1` (wholly floating) and `lsurf − topg <= 0.011` → `base = topg + 0.1 m`.

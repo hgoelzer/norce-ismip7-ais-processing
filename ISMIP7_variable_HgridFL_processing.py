@@ -271,9 +271,10 @@ for field in fieldFL:
     time.standard_name = "time"
     time[:] = timeFL[:]  # time in days since 1850
 
-    time_bounds = ncid.createVariable('time_bounds', 'f4', ('time', 'bnds',))
-    time_bounds[:, 0] = np.array([days_since_1850(int(time_dst[t])-1, 1, 1) for t in range(nt)])
-    time_bounds[:, 1] = timeST[:]
+    # CF bounds variable: must be named 'time_bnds' to match time:bounds
+    time_bnds = ncid.createVariable('time_bnds', 'f4', ('time', 'bnds',))
+    time_bnds[:, 0] = np.array([days_since_1850(int(time_dst[t])-1, 1, 1) for t in range(nt)])
+    time_bnds[:, 1] = timeST[:]
 
     ncid.createDimension('x', size=nx)
     x    = ncid.createVariable('x', 'f4', ('x'))
