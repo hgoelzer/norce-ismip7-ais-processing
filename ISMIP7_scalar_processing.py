@@ -13,7 +13,7 @@ import argparse
 
 # Top-level configuration (paths, interpreter)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import PATH_EXP, DST_PATH
+from config import PATH_EXP, DST_PATH, ISM_ID
 import netCDF4
 from pathlib import Path
 
@@ -25,7 +25,7 @@ from datetime import date, datetime
 # ----------------------------------------------------------------------
 domain_id = 'AIS'  # Ice Sheet name
 source_id = 'NORCE'
-ism_id = 'CISM'
+ism_id = ISM_ID  # from config; can be overridden with --ism_id
 set_id = 'CORE'
 
 dayPerY = 365.
@@ -42,6 +42,8 @@ parser.add_argument('--path_exp',  default=PATH_EXP,
                     help='Path to the ensemble_v1 run directory')
 parser.add_argument('--dstPath',   default=DST_PATH,
                     help='Base path for output')
+parser.add_argument('--ism_id',    default=ISM_ID,
+                    help='ISM model ID for the output path/file names (default from config)')
 args = parser.parse_args()
 
 exp      = args.exp
@@ -49,6 +51,7 @@ ESM_num  = args.ESM_num
 RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
+ism_id   = args.ism_id
 
 # Output experiment name: the data request (and compliance checker) uses
 # 'ctrl' for the control run, while the input directory is named ctrl2015.

@@ -21,7 +21,7 @@ PYTHON = '/nird/datapeak/NS11016K/miniforge3_26/envs/nc/bin/python'
 # ----------------------------------------------------------------------
 # Path to the CISM model output (ensemble_v1 run directory)
 # ----------------------------------------------------------------------
-PATH_EXP = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_08km_ismip7/AIS_08km_v03_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
+PATH_EXP = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
 
 # ----------------------------------------------------------------------
 # Base path for the ISMIP7 output data
@@ -34,7 +34,7 @@ DST_PATH = '/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing'
 # output of different model resolutions sharing the same DST_PATH:
 #   8km ensemble -> 'CISM8'   16km ensemble -> 'CISM'
 # ----------------------------------------------------------------------
-ISM_ID = 'CISM8'
+ISM_ID = 'CISM'
 
 # Directory containing this config file (repo root)
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))

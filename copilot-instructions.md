@@ -11,9 +11,10 @@ Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF out
   - `ISMIP7_variable_HgridFL_processing.py` — flux variables on x1/y1 grid (acabf, libmassbfgr, libmassbffl, dlithkdt, licalvf, lifmassbf, ligroundf)
   - `ISMIP7_variable_VelogridST_processing.py` — velocity variables on x0/y0 grid (xvelmean, yvelmean, strbasemag)
 - `run_all_CORE.py` — wrapper over all 4 scripts for all 11 runs (`--exp`, `--dryrun` flags)
-- `config.py` — central config (paths, interpreter). **Edit this, not the scripts**, to change paths.
+- `config.py` — central config (paths, interpreter, `ISM_ID`). **Edit this, not the scripts**, to change paths.
+- `config_16km.py` — saved 16km settings; to re-run the 16km ensemble, copy it over `config.py`
 - `CORE.csv` — experiment table: counter_id, experiment_id (lowercase: `ctrl`, not `ctrl2015`), start/end year, ESM_id
-- Output: `AIS/NORCE/CISM/CORE/{C001..C011}/` — 27 files per case
+- Output: `AIS/NORCE/{ism_id}/CORE/{C001..C011}/` — 27 files per case; `ism_id` comes from `ISM_ID` in `config.py` (CLI override: `--ism_id`)
 
 ## Environments & commands
 
@@ -24,7 +25,9 @@ Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF out
 
 ## Input data
 
-- NORCE model output: `/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1/`
+- Two ensembles, selected via `PATH_EXP` + `ISM_ID` in `config.py` (swap pattern: `config.py` is the active config; `config_16km.py` holds the 16km settings):
+  - 8km: `.../ais_08km_ismip7/AIS_08km_v03_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1/` with `ISM_ID='CISM8'` (output → `AIS/NORCE/CISM8/CORE/`)
+  - 16km: `.../ais_16km_ismip7/AIS_16km_v01_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1/` with `ISM_ID='CISM'` (output → `AIS/NORCE/CISM/CORE/`)
 - Per run dir `{exp}_{m}_{r}/`: `output.nc` (state, ice_mask), `output_tavg.nc` (basal_mbal_flux_tavg, calving_flux_tavg), `output_g0.nc` (uvel_mean, vvel_mean, btract on x0/y0), `scalars.nc`, `restart_in.nc`
 - 11 runs: {historical,ssp370,ssp126,ssp585,ctrl2015}_{m01,m02}_r01 + ocx_r01
 - ESM mapping: m01=CESM2-WACCM, m02=MRI-ESM2-0; ocx has no ESM → ESM_id='ERA', ISM_member_id='m001'; ocx run dir has no `_{ESM_num}` segment
