@@ -3,7 +3,11 @@
 Offline verification: replicate the isschecker consistency tests for
 base/topg/sftgrf/sftflf and orog/base/lithk on the regenerated output files.
 
-Checks per set_counter directory:
+Vectorized version: each file is read once (all time steps at once), so this
+runs in seconds instead of hours. All variables are ST on the same grid with
+aligned time axes, so no per-year matching is needed.
+
+Checks per set_counter directory (ELEVATION_TOLERANCE = 1e-2 m):
   1. |base - topg| <= 0.01  where sftgrf == 1.0   (grounded)
   2.  base - topg  >  0.01  where sftflf == 1.0   (floating)
   3.  base - topg  >= -0.01 everywhere known      (base not below bed)
@@ -21,30 +25,16 @@ TOL = 1.0e-2
 FILL = 9.96921e+36
 
 
-def read(path):
+def read_all(path):
+    """Read the full (time, y, x) array with auto-masking disabled."""
+    var = os.path.basename(path).split('_')[0]
     with Dataset(path) as nc:
         nc.set_auto_mask(False)
-        return nc.variables['time'][:], nc.variables[os.path.basename(path).split('_')[0]][:]
-
-
-def nominal_years(path):
-    """Nominal year per time step (ST convention: Jan 1 of year+1)."""
-    with Dataset(path) as nc:
-        nc.set_auto_mask(False)
-        t = nc.variables['time'][:]
-    return np.array([1850 + int(round(d / 365.0)) for d in t])
-
-
-def slice_at(path, year):
-    t, v = read(path)
-    yrs = nominal_years(path)
-    idx = np.where(yrs == year)[0]
-    if len(idx) == 0:
-        return None
-    return v[idx[0]]
+        return np.asarray(nc.variables[var][:], dtype='f8')
 
 
 def known(a):
+    """Cells that hold real data (not the f4 fill value, not NaN)."""
     return np.isfinite(a) & (np.abs(a) < FILL / 2)
 
 
@@ -53,66 +43,45 @@ def main():
     total_err = 0
     for d in counters:
         sc = os.path.basename(d)
-        base_f = glob.glob(f'{d}/base_*.nc')
-        if not base_f:
-            print(f'{sc}: no base file, skipping')
+        paths = {}
+        ok = True
+        for v in ('base', 'topg', 'sftgrf', 'sftflf', 'orog', 'lithk'):
+            f = glob.glob(f'{d}/{v}_*.nc')
+            if len(f) != 1:
+                print(f'{sc}: expected exactly one {v} file, found {len(f)} -- skipping')
+                ok = False
+                break
+            paths[v] = f[0]
+        if not ok:
+            total_err += 1
             continue
-        topg_f = glob.glob(f'{d}/topg_*.nc')[0]
-        grf_f = glob.glob(f'{d}/sftgrf_*.nc')[0]
-        flf_f = glob.glob(f'{d}/sftflf_*.nc')[0]
-        orog_f = glob.glob(f'{d}/orog_*.nc')[0]
-        lithk_f = glob.glob(f'{d}/lithk_*.nc')[0]
 
-        errs = 0
-        for bf in base_f:
-            years = nominal_years(bf)
-            for i, yr in enumerate(years):
-                base = slice_at(bf, yr)
-                topg = slice_at(topg_f, yr)
-                grf = slice_at(grf_f, yr)
-                flf = slice_at(flf_f, yr)
-                orog = slice_at(orog_f, yr)
-                lithk = slice_at(lithk_f, yr)
-                if base is None or topg is None:
-                    print(f'{sc}: year {yr} missing in base/topg, skipping')
-                    continue
+        base, topg = read_all(paths['base']), read_all(paths['topg'])
+        grf, flf = read_all(paths['sftgrf']), read_all(paths['sftflf'])
+        orog, lithk = read_all(paths['orog']), read_all(paths['lithk'])
 
-                ok = known(base) & known(topg)
-                above = base - topg
+        if not (base.shape == topg.shape == grf.shape == flf.shape
+                == orog.shape == lithk.shape):
+            print(f'{sc}: shape mismatch across files -- skipping')
+            total_err += 1
+            continue
 
-                # 3. base below bed
-                n = int((ok & (above < -TOL)).sum())
-                if n:
-                    errs += n
-                    print(f'{sc} yr {yr}: base below topg in {n} cell(s)')
+        k = known(base) & known(topg)
+        above = base - topg
 
-                # 1. grounded
-                if grf is not None:
-                    g = ok & known(grf) & (grf == 1.0)
-                    n = int((g & (np.abs(above) > TOL)).sum())
-                    if n:
-                        errs += n
-                        print(f'{sc} yr {yr}: grounded base!=topg in {n} cell(s)')
+        n3 = int((k & (above < -TOL)).sum())                       # below bed
+        g = k & known(grf) & (grf == 1.0)
+        n1 = int((g & (np.abs(above) > TOL)).sum())                # grounded afloat
+        f = k & known(flf) & (flf == 1.0)
+        n2 = int((f & (above <= TOL)).sum())                       # floating aground
+        k4 = k & known(orog) & known(lithk)
+        n4 = int((k4 & (np.abs(base + lithk - orog) > TOL)).sum()) # orog identity
 
-                # 2. floating
-                if flf is not None:
-                    f = ok & known(flf) & (flf == 1.0)
-                    n = int((f & (above <= TOL)).sum())
-                    if n:
-                        errs += n
-                        print(f'{sc} yr {yr}: floating base<=topg+tol in {n} cell(s)')
-
-                # 4. orog identity
-                if orog is not None and lithk is not None:
-                    k4 = ok & known(orog) & known(lithk)
-                    n = int((k4 & (np.abs(base + lithk - orog) > TOL)).sum())
-                    if n:
-                        errs += n
-                        print(f'{sc} yr {yr}: orog != base+lithk in {n} cell(s)')
-
-        status = 'OK' if errs == 0 else f'{errs} VIOLATION(S)'
+        errs = n1 + n2 + n3 + n4
         total_err += errs
-        print(f'{sc}: {status}')
+        status = 'OK' if errs == 0 else f'{errs} VIOLATION(S)'
+        print(f'{sc}: grounded-afloat={n1}, floating-aground={n2}, '
+              f'below-bed={n3}, orog-identity={n4}  -> {status}')
 
     print(f'\nTotal violations: {total_err}')
     sys.exit(1 if total_err else 0)
