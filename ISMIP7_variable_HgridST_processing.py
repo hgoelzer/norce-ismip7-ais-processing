@@ -169,6 +169,63 @@ ny = len(y_dst)
 
 print(f"nt={nt}, ny={ny}, nx={nx}")
 
+# ----------------------------------------------------------------------
+# Cosmetic consistency fix for 'base' vs 'topg' (compliance checker):
+#   Case 1: where the ice is wholly grounded (sftgrf == 1), base must equal
+#           topg within the checker's 1 cm tolerance -> set base = topg.
+#   Case 2: where the ice is wholly floating (sftflf == 1), base must be
+#           strictly more than 1 cm above topg -> set base = topg + 0.1 m.
+# The same correction (delta) is added to 'orog' so that the checker
+# identity orog = base + lithk (1 cm tolerance) stays intact.
+# Expected corrections are cm-scale artifacts; anything larger than
+# OROG_WARN_LIMIT m triggers a strong warning (see below).
+# ----------------------------------------------------------------------
+ELEV_TOL      = 0.009  # detection threshold: 1 mm inside checker's ELEVATION_TOLERANCE = 1e-2 m
+FLOAT_OFFSET  = 0.1    # m above the bed enforced for wholly floating ice
+OROG_WARN_LIMIT = 1.0  # m: strong warning if the applied orog correction exceeds this
+MASK_TOL      = 1e-6   # f_ground/f_float are float64 in the source; values within
+                       # 1-1e-6 of 1 round to exactly 1.0 in the written float32
+                       # files, which is what the compliance checker tests against.
+
+# Boolean fix masks; cells with missing (masked) data are never fixed.
+# NOTE: compare the masks with a tolerance, not == 1.0: f_float = 1 - f_ground
+# can be 0.999999997 in float64 yet round to exactly 1.0 in the float32 output.
+grounded_fix = np.ma.filled(
+    (f_ground > 1.0 - MASK_TOL) & (np.abs(lsurf_dst - topg_dst) > ELEV_TOL), False)
+floating_fix = np.ma.filled(
+    (f_float > 1.0 - MASK_TOL) & ((lsurf_dst - topg_dst) <= ELEV_TOL + 0.002), False)
+
+base_out = np.ma.array(lsurf_dst, copy=True)
+base_out[grounded_fix] = topg_dst[grounded_fix]                    # case 1: base = topg
+base_out[floating_fix] = topg_dst[floating_fix] + FLOAT_OFFSET     # case 2: base = topg + 0.1 m
+
+delta      = base_out - lsurf_dst          # correction applied to base (and orog)
+orog_out   = usurf_dst + delta             # keep orog = base + lithk intact
+fix_mask   = grounded_fix | floating_fix
+n_grounded = int(grounded_fix.sum())
+n_floating = int(floating_fix.sum())
+n_changed  = int(fix_mask.sum())
+
+print(f"base/topg cosmetic fix: {n_grounded} wholly-grounded cell(s) set to topg, "
+      f"{n_floating} wholly-floating cell(s) set to topg + {FLOAT_OFFSET} m")
+if n_changed > 0:
+    d_fix = np.abs(np.ma.filled(delta, 0.0))[fix_mask]
+    d_min = float(np.ma.filled(delta, 0.0)[fix_mask].min())
+    d_max = float(np.ma.filled(delta, 0.0)[fix_mask].max())
+    print(f"orog correction: {n_changed} cell(s) changed, "
+          f"min {d_min:+.4f} m, max {d_max:+.4f} m, max |correction| {float(d_fix.max()):.4f} m")
+    if float(d_fix.max()) > OROG_WARN_LIMIT:
+        t_idx, y_idx, x_idx = np.unravel_index(
+            int(np.argmax(np.abs(np.ma.filled(delta, 0.0)).reshape(-1))), delta.shape)
+        print('*' * 80)
+        print(f"*** WARNING: applied orog correction exceeds {OROG_WARN_LIMIT} m "
+              f"(max {float(d_fix.max()):.3f} m at time index {t_idx}, "
+              f"y index {y_idx}, x index {x_idx}) ***")
+        print("*** This is NOT a cosmetic artifact -- check for a real model problem ***")
+        print('*' * 80)
+else:
+    print("orog correction: no cells changed")
+
 # The time_range tag in the output filename is derived from the data:
 # entry t (CISM year time_dst[t]) covers nominal year time_dst[t]-1, so the
 # first/last nominal years are time_dst[0]-1 / time_dst[-1]-1. It therefore
@@ -239,7 +296,8 @@ for field in fieldST:
         orog.long_name     = 'surface elevation'
         orog.standard_name = 'surface_altitude'
         orog.comment       = 'the altitude or surface elevation of the ice sheet'
-        orog[:, :, :] = usurf_dst[:, :, :]
+        # usurf plus the cosmetic base/topg correction (keeps orog = base + lithk)
+        orog[:, :, :] = orog_out[:, :, :]
 
     if field in ['base']:
         base = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])
@@ -247,7 +305,8 @@ for field in fieldST:
         base.long_name     = 'base elevation'
         base.standard_name = 'base_altitude'
         base.comment       = 'the altitude of the lower ice surface elevation of the ice sheet'
-        base[:, :, :] = lsurf_dst[:, :, :]
+        # lsurf with the cosmetic base/topg consistency fix applied
+        base[:, :, :] = base_out[:, :, :]
 
     if field in ['topg']:
         topg = ncid.createVariable(field, 'f4', ('time', 'y', 'x'), fill_value=netCDF4.default_fillvals['f4'])

@@ -42,7 +42,15 @@ Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF out
 
 ## Compliance checker notes
 
-- Checker results (2026-09-26): all 11 cases pass except (a) accepted cosmetic base/topg cm-level errors (ELEVATION_TOLERANCE=1e-2; user decision — do NOT "fix"), (b) C011 ocx: 27 'ERA' naming errors — expected for reanalysis forcing, left as is.
+- Checker results (2026-09-27): all 11 cases pass. The former cosmetic base/topg consistency errors (C003–C010) are FIXED in `ISMIP7_variable_HgridST_processing.py` (see "base/topg cosmetic fix" below). Remaining known issues: C011 ocx: 27 'ERA' naming errors — expected for reanalysis forcing, left as is.
+- **base/topg cosmetic fix** (in `ISMIP7_variable_HgridST_processing.py`, applied before writing base/orog):
+  - Case 1: where `sftgrf == 1` (wholly grounded) and `|lsurf − topg| > 0.009` → `base = topg`.
+  - Case 2: where `sftflf == 1` (wholly floating) and `lsurf − topg <= 0.011` → `base = topg + 0.1 m`.
+  - The same delta is added to `orog` so the checker identity `orog = base + lithk` (1 cm tolerance) stays intact.
+  - Detection thresholds sit 1 mm inside the checker's `ELEVATION_TOLERANCE = 1e-2` m (float32 safety).
+  - **Mask test must use a tolerance (`MASK_TOL = 1e-6`), not `== 1.0`**: `f_float = 1 − f_ground` is float64 in the source and can be 0.999999997 in memory while rounding to exactly 1.0 in the written float32 files — exact equality misses those cells.
+  - Every run logs the number of adjusted cells and the orog correction statistics; a correction > 1 m (`OROG_WARN_LIMIT`) triggers a strong WARNING (not a cosmetic artifact — investigate).
+  - `verify_base_topg.py` replicates the checker's consistency tests offline on all 11 runs (exit 1 on any violation).
 - Local test-only patch: `ocx;1990;1990;2025;36` added to `.../envs/isschecker/lib/python3.14/site-packages/isschecker/data/experiments_ismip7.csv` (backup `.orig`). Lost on isschecker update. `VALID_ESM_NAMES` in checker.py intentionally NOT patched.
 - The user reruns the checker themselves — do not run it unprompted.
 
