@@ -11,12 +11,14 @@ ISMIP7-formatted NetCDF files per experiment and variable, organised in
 | File | Purpose |
 |------|---------|
 | `config.py` | Top-level configuration: model output path, output path, metadata (ISM_ID, contacts) |
+| `config_16km.py` | Saved 16km settings; to re-run the 16km ensemble, copy it over `config.py` |
 | `run_all_CORE.py` | Wrapper: runs all 4 scripts for all 11 CORE experiments |
 | `ISMIP7_scalar_processing.py` | Scalar (time-only) variables: lim, limnsw, iareagr, iareafl, tend* |
 | `ISMIP7_variable_HgridST_processing.py` | Horizontal-grid state variables: lithk, orog, topg, base, sftgif, sftgrf, sftflf |
 | `ISMIP7_variable_HgridFL_processing.py` | Horizontal-grid flux variables: acabf, dlithkdt, ligroundf, lifmassbf |
 | `ISMIP7_variable_VelogridST_processing.py` | Velocity-grid state variables (skipped: source vars not in NORCE output) |
 | `CORE.csv` | ISMIP7 CORE experiment definition (counter_id, experiment, years, ESM) |
+| `HANDOFF_TO_AIS.md` | Notes handed over from the GrIS processing repo, with port status |
 
 ## Environment
 
