@@ -13,12 +13,6 @@ command line (--path_exp, --dstPath).
 import os
 
 # ----------------------------------------------------------------------
-# Python interpreter used by the wrapper to run the processing scripts
-# (must have netCDF4, numpy and scipy installed)
-# ----------------------------------------------------------------------
-PYTHON = '/nird/datapeak/NS11016K/miniforge3_26/envs/nc/bin/python'
-
-# ----------------------------------------------------------------------
 # Path to the CISM model output (ensemble_v1 run directory)
 # ----------------------------------------------------------------------
 PATH_EXP = '/nird/datapeak/NS11016K/users/heig/CISM/AIS/ais_08km_ismip7/AIS_08km_v03_geo01_ghf01_smb03_bas01_otf01_mel02_tun01_pow/ensemble_v1'
@@ -30,11 +24,19 @@ DST_PATH = '/nird/datalake/NS11016K/users/heig/ISMIP7/data_processing'
 
 # ----------------------------------------------------------------------
 # ISM model ID used in the output directory tree and file names
-# ({DST_PATH}/AIS/NORCE/{ISM_ID}/CORE/{C001..C011}/). This separates the
-# output of different model resolutions sharing the same DST_PATH:
-#   8km ensemble -> 'CISM8'   16km ensemble -> 'CISM'
+# ({DST_PATH}/AIS/NORCE/{ISM_ID}/CORE/{C001..C011}/) and as the `model`
+# global attribute in the output files.
 # ----------------------------------------------------------------------
-ISM_ID = 'CISM8'
+ISM_ID = 'CISM'
+
+# ----------------------------------------------------------------------
+# Metadata written as global attributes in the output files
+# ----------------------------------------------------------------------
+DOMAIN_ID = 'AIS'    # Ice sheet
+SOURCE_ID = 'NORCE'  # Modelling group (also global attribute `group`)
+SET_ID = 'CORE'      # Experiment set
+CONTACT_NAME = 'Maria Paz Lira, Heiko Goelzer'
+CONTACT_EMAIL = 'mali@norceresearch.no, heig@norceresearch.no'
 
 # Directory containing this config file (repo root)
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))

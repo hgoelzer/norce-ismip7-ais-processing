@@ -11,9 +11,10 @@ from netCDF4 import Dataset
 import sys, os
 import argparse
 
-# Top-level configuration (paths, interpreter)
+# Top-level configuration (paths, metadata)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import PATH_EXP, DST_PATH, ISM_ID
+from config import (PATH_EXP, DST_PATH, ISM_ID, CONTACT_NAME, CONTACT_EMAIL,
+                    DOMAIN_ID, SOURCE_ID, SET_ID)
 import netCDF4
 from pathlib import Path
 
@@ -66,9 +67,8 @@ path_exp = args.path_exp
 dstPath  = args.dstPath
 ism_id   = args.ism_id
 
-# Output experiment name: the data request (and compliance checker) uses
-# 'ctrl' for the control run, while the input directory is named ctrl2015.
-exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+# exp is the data-request experiment name used in the output file names
+# ('ctrl', not the input directory name 'ctrl2015'; see run_dir below).
 
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
@@ -97,7 +97,7 @@ exp_map = {
     'ssp370':     'C003',
     'ssp126':     'C005',
     'ssp585':     'C007',
-    'ctrl2015':   'C009',
+    'ctrl':       'C009',
     'ocx':        'C011',
 }
 if exp in exp_map:
@@ -115,11 +115,17 @@ elif ESM_num == 'm02':
 else:
     sys.exit(f'Error: unknown ESM_num {ESM_num}')
 
-# OCX run directory has no _{ESM_num}_{RCM_num} suffix
-if exp == 'ocx':
-    run_dir = f"{path_exp}/ocx_{RCM_num}"
-else:
-    run_dir = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
+# OCX run directory has no _{ESM_num}_{RCM_num} suffix; the control run is
+# selected as 'ctrl' but its input directory keeps the name ctrl2015_*.
+def run_dir(exp, ESM_num, RCM_num):
+    if exp == 'ocx':
+        return f"{path_exp}/ocx_{RCM_num}"
+    if exp == 'ctrl':
+        return f"{path_exp}/ctrl2015_{ESM_num}_{RCM_num}"
+    return f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
+
+
+run_dir = run_dir(exp, ESM_num, RCM_num)
 
 fileVar = f"{run_dir}/output.nc"
 fileVarVel = f"{run_dir}/output.nc"
@@ -253,7 +259,7 @@ print(time_dst)
 for field in fieldFL:
 
     # Create the field output file.
-    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
+    dstFile = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(dstFile):
@@ -355,9 +361,9 @@ for field in fieldFL:
         ligroundf.standard_name = 'land_ice_specific_grounding_line_flux'
         ligroundf[:, :, :] = 0
 
-    ncid.group = 'NORCE'
-    ncid.model = 'CISM3'
-    ncid.contact_name = 'Heiko Goelzer'
-    ncid.contact_email = 'heig@norceresearch.no'
+    ncid.group = source_id
+    ncid.model = ism_id
+    ncid.contact_name = CONTACT_NAME
+    ncid.contact_email = CONTACT_EMAIL
     ncid.crs = 'epsg:3031'
     ncid.close()

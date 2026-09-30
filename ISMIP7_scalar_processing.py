@@ -11,9 +11,10 @@ from netCDF4 import Dataset
 import sys, os
 import argparse
 
-# Top-level configuration (paths, interpreter)
+# Top-level configuration (paths, metadata)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import PATH_EXP, DST_PATH, ISM_ID
+from config import (PATH_EXP, DST_PATH, ISM_ID, CONTACT_NAME, CONTACT_EMAIL,
+                    DOMAIN_ID, SOURCE_ID, SET_ID)
 import netCDF4
 from pathlib import Path
 
@@ -21,12 +22,12 @@ from datetime import date, datetime
 
 
 # ----------------------------------------------------------------------
-# Strings for file naming convention:
+# Strings for file naming convention (from config):
 # ----------------------------------------------------------------------
-domain_id = 'AIS'  # Ice Sheet name
-source_id = 'NORCE'
+domain_id = DOMAIN_ID  # Ice Sheet name
+source_id = SOURCE_ID
 ism_id = ISM_ID  # from config; can be overridden with --ism_id
-set_id = 'CORE'
+set_id = SET_ID
 
 dayPerY = 365.
 sPerY = 31556926.
@@ -35,7 +36,7 @@ sPerY = 31556926.
 # Command line arguments (defaults reproduce the previous hard-coded run)
 # ----------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='ISMIP7 AIS scalar data processing')
-parser.add_argument('--exp',       default='ssp585', help='Experiment name (e.g. historical, ssp126, ssp370, ssp585, ctrl2015, ocx)')
+parser.add_argument('--exp',       default='ssp585', help='Experiment name (e.g. historical, ssp126, ssp370, ssp585, ctrl, ocx)')
 parser.add_argument('--ESM_num',   default='m01',    help='ESM ensemble member (m01, m02); ocx run uses r01 only')
 parser.add_argument('--RCM_num',   default='r01',    help='RCM/ISM configuration number')
 parser.add_argument('--path_exp',  default=PATH_EXP,
@@ -53,9 +54,8 @@ path_exp = args.path_exp
 dstPath  = args.dstPath
 ism_id   = args.ism_id
 
-# Output experiment name: the data request (and compliance checker) uses
-# 'ctrl' for the control run, while the input directory is named ctrl2015.
-exp_out = 'ctrl' if exp == 'ctrl2015' else exp
+# exp is the data-request experiment name used in the output file names
+# ('ctrl', not the input directory name 'ctrl2015'; see run_dir below).
 
 # ----------------------------------------------------------------------
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
@@ -84,7 +84,7 @@ exp_map = {
     'ssp370':     'C003',
     'ssp126':     'C005',
     'ssp585':     'C007',
-    'ctrl2015':   'C009',
+    'ctrl':       'C009',
     'ocx':        'C011',
 }
 if exp in exp_map:
@@ -102,11 +102,17 @@ elif ESM_num == 'm02':
 else:
     sys.exit(f'Error: unknown ESM_num {ESM_num}')
 
-# OCX run directory has no _{ESM_num}_{RCM_num} suffix
-if exp == 'ocx':
-    run_dir = f"{path_exp}/ocx_{RCM_num}"
-else:
-    run_dir = f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
+# OCX run directory has no _{ESM_num}_{RCM_num} suffix; the control run is
+# selected as 'ctrl' but its input directory keeps the name ctrl2015_*.
+def run_dir(exp, ESM_num, RCM_num):
+    if exp == 'ocx':
+        return f"{path_exp}/ocx_{RCM_num}"
+    if exp == 'ctrl':
+        return f"{path_exp}/ctrl2015_{ESM_num}_{RCM_num}"
+    return f"{path_exp}/{exp}_{ESM_num}_{RCM_num}"
+
+
+run_dir = run_dir(exp, ESM_num, RCM_num)
 
 fileScalar = f"{run_dir}/scalars.nc"
 
@@ -212,7 +218,7 @@ for t in range(nt):
 # count = 0
 for field in outField:
     # Create the field output file.
-    outfilenamescal = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp_out}_{set_counter}_{time_range}.nc"
+    outfilenamescal = f"{dstDir}{field}_{domain_id}_{source_id}_{ism_id}_{ISM_member_id}_{ESM_id}_{forcing_member_id}_{exp}_{set_counter}_{time_range}.nc"
 
     # Removing the output file if it already exists.
     if os.path.isfile(outfilenamescal):
@@ -263,10 +269,10 @@ for field in outField:
             iareafl.standard_name = 'floating_ice_shelf_area'
             iareafl[:] = iareafc[:]
 
-        ncid.group = 'NORCE'
-        ncid.model = 'CISM3'
-        ncid.contact_name = 'Heiko Goelzer'
-        ncid.contact_email = 'heig@norceresearch.no'
+        ncid.group = source_id
+        ncid.model = ism_id
+        ncid.contact_name = CONTACT_NAME
+        ncid.contact_email = CONTACT_EMAIL
         ncid.crs = 'epsg:3031'
         ncid.close()
 
@@ -337,10 +343,10 @@ for field in outField:
             tendligroundf.standard_name = 'tendency_of_grounded_ice_mass'
             tendligroundf[:] = tglfc[:]  # zeros - not available in NORCE output
 
-        ncid.group = 'NORCE'
-        ncid.model = 'CISM3'
-        ncid.contact_name = 'Heiko Goelzer'
-        ncid.contact_email = 'heig@norceresearch.no'
+        ncid.group = source_id
+        ncid.model = ism_id
+        ncid.contact_name = CONTACT_NAME
+        ncid.contact_email = CONTACT_EMAIL
         ncid.crs = 'epsg:3031'
         ncid.close()
 
