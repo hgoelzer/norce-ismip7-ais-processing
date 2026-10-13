@@ -14,7 +14,7 @@ import argparse
 # Top-level configuration (paths, metadata)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (PATH_EXP, DST_PATH, ISM_ID, CONTACT_NAME, CONTACT_EMAIL,
-                    DOMAIN_ID, SOURCE_ID, SET_ID)
+                    DOMAIN_ID, SOURCE_ID, SET_ID, ISM_MEMBER_ID)
 import netCDF4
 from pathlib import Path
 
@@ -57,6 +57,10 @@ parser.add_argument('--dstPath',   default=DST_PATH,
                     help='Base path for output')
 parser.add_argument('--ism_id',    default=ISM_ID,
                     help='ISM model ID for the output path/file names (default from config)')
+parser.add_argument('--set_id',    default=SET_ID,
+                    help='Experiment set ID (CORE, PPE); first letter gives the set_counter prefix')
+parser.add_argument('--ism_member_id', default=ISM_MEMBER_ID,
+                    help='ISM member ID (e.g. m001); default from config')
 args = parser.parse_args()
 
 exp      = args.exp
@@ -65,6 +69,8 @@ RCM_num  = args.RCM_num
 path_exp = args.path_exp
 dstPath  = args.dstPath
 ism_id   = args.ism_id
+set_id   = args.set_id
+ism_member_override = args.ism_member_id
 
 # exp is the data-request experiment name used in the output file names
 # ('ctrl', not the input directory name 'ctrl2015'; see run_dir below).
@@ -73,16 +79,20 @@ ism_id   = args.ism_id
 # Derive ESM_id / ISM_member_id from the ESM ensemble member
 # ----------------------------------------------------------------------
 ESM_map = {
-    'm01': ('CESM2-WACCM', 'm001'),
-    'm02': ('MRI-ESM2-0',  'm002'),
+    'm01': 'CESM2-WACCM',
+    'm02': 'MRI-ESM2-0',
 }
+# ESM_id from the ESM ensemble member; the ISM member ID comes from
+# config (--ism_member_id override), so ESM_id alone distinguishes the
+# forcing.
 if exp == 'ocx':
     # OCX doesn't have an ESM; use ERA
-    ESM_id, ISM_member_id = 'ERA', 'm001'
+    ESM_id = 'ERA'
 elif ESM_num in ESM_map:
-    ESM_id, ISM_member_id = ESM_map[ESM_num]
+    ESM_id = ESM_map[ESM_num]
 else:
     sys.exit(f'Error: unknown ESM_num {ESM_num}')
+ISM_member_id = ism_member_override
 
 forcing_member_id = 'f001'
 
@@ -104,13 +114,16 @@ if exp in exp_map:
 else:
     sys.exit(f'Error: unknown experiment {exp}')
 
+# Set_counter prefix follows the set: CORE -> C001..., PPE -> P001...
+counter_pfx = set_id[0]
+
 # m01/m02 runs get consecutive set_counters (e.g. ssp126 -> C005/C006)
 if exp == 'ocx':
-    set_counter = set_counter_base
+    set_counter = counter_pfx + set_counter_base[1:]
 elif ESM_num == 'm01':
-    set_counter = set_counter_base
+    set_counter = counter_pfx + set_counter_base[1:]
 elif ESM_num == 'm02':
-    set_counter = 'C%03d' % (int(set_counter_base[1:]) + 1)
+    set_counter = '%s%03d' % (counter_pfx, int(set_counter_base[1:]) + 1)
 else:
     sys.exit(f'Error: unknown ESM_num {ESM_num}')
 
