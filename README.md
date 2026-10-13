@@ -32,7 +32,7 @@ configuration (default `config.py`; use `--config config_16km.py` for the
 | `ISMIP7_variable_HgridFL_processing.py` | Horizontal-grid flux variables: acabf, dlithkdt, ligroundf, lifmassbf |
 | `ISMIP7_variable_VelogridST_processing.py` | Velocity-grid state variables (skipped: source vars not in NORCE output) |
 | `CORE.csv` | ISMIP7 CORE experiment definition (counter_id, experiment, years, ESM) |
-| `HANDOFF_TO_AIS.md` | Notes handed over from the GrIS processing repo, with port status |
+| `AGENTS.md` | Repository guidelines for coding agents |
 
 ## Environment
 
@@ -56,7 +56,7 @@ at once:
 - `PATH_EXP` — path to the CISM `ensemble_v1` model output directory
 - `DST_PATH` — base path for the ISMIP7 output data
 - `ISM_ID` — ISM model ID used in the output tree/file names and the `model` attribute
-- `DOMAIN_ID`, `SOURCE_ID`, `SET_ID` — file-naming identifiers (`AIS`, `NORCE`, `CORE`)
+- `DOMAIN_ID`, `SOURCE_ID`, `SET_ID`, `ISM_MEMBER_ID` — file-naming identifiers (`AIS`, `NORCE`, `CORE`, `m001`)
 - `CONTACT_NAME`, `CONTACT_EMAIL` — written as global attributes in the output files
 
 Individual scripts can still override the paths on the command line with
@@ -74,6 +74,20 @@ python run_all_CORE.py --dryrun        # print commands without executing
 
 The wrapper cycles through the 11 (experiment, ESM member) combinations,
 skips runs with missing input, and prints a summary table at the end.
+
+## Running the PPEcore (16km) wrapper
+
+```bash
+python run_all_PPEcore.py --config config_16km.py   # all 11 runs -> PPE/P001..P011
+python run_all_PPEcore.py --config config_16km.py --exp ssp126    # one experiment
+python run_all_PPEcore.py --config config_16km.py --exp P004      # one case by PPE counter id
+python run_all_PPEcore.py --config config_16km.py --dryrun        # print commands only
+```
+
+`--config` selects the configuration module (default `config.py`); it
+supplies the input path, `SET_ID` and `ISM_MEMBER_ID` for the run.
+Alternatively copy `config_16km.py` over `config.py` and omit `--config`.
+The same skip logic and summary table as `run_all_CORE.py` apply.
 
 ## Running standalone scripts
 
