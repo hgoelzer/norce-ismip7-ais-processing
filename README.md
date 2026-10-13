@@ -6,13 +6,27 @@ The scripts read the NORCE CISM `ensemble_v1` model output and write
 ISMIP7-formatted NetCDF files per experiment and variable, organised in
 `C001`–`C011` output directories (see `CORE.csv` for the experiment list).
 
+The 4 processing scripts support additional CLI options for other
+submissions: `--set_id` (e.g. `PPE`; its first letter gives the
+set_counter prefix, so `P001..`) and `--ism_member_id` (e.g. `m002`).
+Both default to the `SET_ID` / `ISM_MEMBER_ID` values in the active
+`config.py` — that file is the single source of truth. `run_all_PPEcore.py`
+runs the 11 CORE experiments with `--config <module>` selecting the
+configuration (default `config.py`; use `--config config_16km.py` for the
+16km ensemble) and writes the output under
+`AIS/NORCE/{ISM_ID}/{SET_ID}/{counter}/` (e.g. `PPE/P001..P011/` with
+`ISM_member_id=m002`). Alternatively, copy `config_16km.py` over
+`config.py` and run without `--config`.
+
 ## Repository contents
 
 | File | Purpose |
 |------|---------|
-| `config.py` | Top-level configuration: model output path, output path, metadata (ISM_ID, contacts) |
-| `config_16km.py` | Saved 16km settings; to re-run the 16km ensemble, copy it over `config.py` |
+| `config.py` | Top-level configuration: model output path, output path, metadata (`SET_ID`, `ISM_MEMBER_ID`, `ISM_ID`, contacts) |
+| `config_08km.py` | Saved 8km CORE settings; to re-run the 8km ensemble, copy it over `config.py` |
+| `config_16km.py` | Saved 16km PPEcore settings (`PATH_EXP`, `SET_ID=PPE`, `ISM_MEMBER_ID=m002`); to re-run, copy it over `config.py` or pass `--config config_16km.py` |
 | `run_all_CORE.py` | Wrapper: runs all 4 scripts for all 11 CORE experiments |
+| `run_all_PPEcore.py` | Wrapper: same 11 runs, written to the `PPE/P001..P011/` tree; `--config` selects the configuration module |
 | `ISMIP7_scalar_processing.py` | Scalar (time-only) variables: lim, limnsw, iareagr, iareafl, tend* |
 | `ISMIP7_variable_HgridST_processing.py` | Horizontal-grid state variables: lithk, orog, topg, base, sftgif, sftgrf, sftflf |
 | `ISMIP7_variable_HgridFL_processing.py` | Horizontal-grid flux variables: acabf, dlithkdt, ligroundf, lifmassbf |

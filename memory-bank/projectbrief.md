@@ -1,4 +1,4 @@
-# Copilot Instructions — NORCE ISMIP7 AIS Processing
+# AGENT Instructions — NORCE ISMIP7 AIS Processing
 
 Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF output
 (11 CORE experiments), validated with the ISM_SimulationChecker (`isschecker`).

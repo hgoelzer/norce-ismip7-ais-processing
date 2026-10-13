@@ -34,9 +34,10 @@ ISM_ID = 'CISM'
 # ----------------------------------------------------------------------
 DOMAIN_ID = 'AIS'    # Ice sheet
 SOURCE_ID = 'NORCE'  # Modelling group (also global attribute `group`)
-SET_ID = 'CORE'      # Experiment set
-CONTACT_NAME = 'Maria Paz Lira, Heiko Goelzer'
-CONTACT_EMAIL = 'mali@norceresearch.no, heig@norceresearch.no'
+SET_ID = 'PPE'          # Experiment set (also gives the set_counter prefix)
+ISM_MEMBER_ID = 'm002'  # ISM member ID in the output file names (PPEcore)
+CONTACT_NAME = 'Heiko Goelzer'
+CONTACT_EMAIL = 'heig@norceresearch.no'
 
 # Directory containing this config file (repo root)
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))

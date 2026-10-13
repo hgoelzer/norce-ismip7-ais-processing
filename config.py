@@ -35,6 +35,7 @@ ISM_ID = 'CISM'
 DOMAIN_ID = 'AIS'    # Ice sheet
 SOURCE_ID = 'NORCE'  # Modelling group (also global attribute `group`)
 SET_ID = 'CORE'      # Experiment set
+ISM_MEMBER_ID = 'm001'  # ISM member ID in the output file names
 CONTACT_NAME = 'Heiko Goelzer'
 CONTACT_EMAIL = 'heig@norceresearch.no'
 
