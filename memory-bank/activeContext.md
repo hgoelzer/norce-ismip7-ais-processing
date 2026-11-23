@@ -1,7 +1,14 @@
 # Active Context — NORCE ISMIP7 AIS Processing
 
-## Current state (2026-10-13)
+## Current state (2026-11-23)
 
+- **HgridFL filePrev block removed** — the previous-experiment read
+  (`basal_flux_dst[0,:,:] = nidprev[...]`) was already commented out,
+  so no output depends on predecessor files; the block only existed as
+  an existence check that could spuriously kill a run (as reported by
+  an external user for their `ctrl-proj_*` setup). Also dropped the
+  unused `readListPrevExptString` lists. Verified by py_compile; no
+  output regeneration needed.
 - 8km CORE submission (11 runs, C001..C011) is complete and
   checker-validated; regenerate with `run_all_CORE.py` if needed.
 - **New: PPE tree for the 16km ensemble.** `run_all_PPEcore.py` runs the

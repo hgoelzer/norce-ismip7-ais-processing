@@ -150,9 +150,6 @@ fieldFL = ['acabf', 'libmassbfgr', 'libmassbffl', 'dlithkdt',
 #           'dthck_dt','calving_flux_tavg', 'gl_flux_tavg','latmelt_flux_tavg']
 
 
-# List of variable that needs to be read from previous experiment
-readListPrevExptString = ['ligroundf', 'licalvf', 'dlithkdt', 'libmassbfgr', 'libmassbffl', 'acabf']
-
 fieldReady = ['acabf', 'dlithkdt', 'licalvf', 'ligroundf', 'lifmassbf']
 nameCISM = ['acab_applied_tavg', 'dthck_dt', 'calving_flux_tavg', 'gl_flux_tavg', 'latmelt_flux_tavg']
 
@@ -220,31 +217,6 @@ print(f"nt={nt}, ny={ny}, nx={nx}")
 # adjusts automatically when a run is extended by one year.
 time_range = f"{int(time_dst[0])-1}-{int(time_dst[-1])-1}"
 print('time_range =', time_range)
-
-
-# readListPrevExptString = [ 'licalvf', 'dlithkdt',  'acabf']
-if exp in ['historical']:
-    # Need to read in the last time slice of the spin-up
-    filePrev = f"{path_exp}/ctrl2015_{ESM_num}_{RCM_num}/restart_in.nc"
-
-elif exp == 'ocx':
-    # OCX is a standalone run with no historical predecessor;
-    # use its own spin-up restart like the historical run does
-    filePrev = f"{path_exp}/ocx_{RCM_num}/restart_in.nc"
-
-else:
-    # Need to read the last time slice of the historical
-    filePrev = f"{path_exp}/historical_{ESM_num}_{RCM_num}/output.nc"
-
-try:
-    nidprev = Dataset(filePrev, 'r')
-    print('filePrev =', filePrev)
-except Exception:
-    print('Error: Unable to open CISM previous file ', filePrev)
-    sys.exit('exiting program now')
-
-# basal_flux_dst[0,:,:] = nidprev['acab_applied_tavg'][-1,:,:]
-nidprev.close()
 
 
 # ----------------------------------------------------------------------

@@ -34,7 +34,12 @@ Project: post-processing of NORCE CISM AIS runs into ISMIP7-compliant NetCDF out
 - Experiment → counter: historical→C001/C002 (1970-2014), ssp370→C003/C004 (2015-2100), ssp126→C005/C006 (2015-2300), ssp585→C007/C008 (2015-2300), ctrl→C009/C010 (2015-2300), ocx→C011 (1990-2025). m02 gets base counter +1 (`C%03d`).
 - **`ctrl` naming**: `--exp ctrl` selects the control runs (data-request name, used in output file names); the input directories on disk keep their `ctrl2015_*` names — resolved via the `run_dir` helper in each script and in `run_all_CORE.py`. Never pass `ctrl2015` to `--exp`.
 - **Metadata**: `ncid.group = source_id`, `ncid.model = ism_id`, contacts from `CONTACT_NAME`/`CONTACT_EMAIL` in config — all driven by `config.py`, never hardcoded in the scripts (the old hardcoded `model='CISM3'` was a bug, fixed 2026-09-30).
-- HgridFL filePrev logic: historical → ctrl2015 restart_in.nc; ocx → ocx restart_in.nc (no historical predecessor); else → historical output.nc
+- HgridFL filePrev block removed (2026-11-23): the previous-experiment
+  read was already commented out (no output depends on predecessor
+  files), so the block was a dead existence check that could
+  spuriously kill a run. Was: historical → ctrl2015 restart_in.nc;
+  ocx → ocx restart_in.nc; else → historical output.nc. No output
+  regeneration needed.
 
 ## Critical domain rules (do not violate)
 
